@@ -1,4 +1,5 @@
-插件的代码，大部分都是让deepseek自己写的。  
+插件的代码，大部分都是让deepseek自己写的，有问题可以找deepseek。让他自己优化。  
+
 
 
 插件名称：小半deepseek助手  
