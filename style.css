@@ -10,7 +10,7 @@ body {
 #deepseek-chat-container {
     display: flex;
     height: 80vh;
-    max-width: 980px;
+    max-width: 1200px;
     margin: 20px auto;
     border: none;
     border-radius: 16px;
@@ -21,7 +21,7 @@ body {
 
 /* 历史对话框样式 */
 #deepseek-chat-history {
-    width: 300px;
+    width: 220px;
     background: linear-gradient(180deg, #ffffff, #f9fbfd);
     border-right: 1px solid #e0e0e0;
     padding: 20px;
@@ -119,6 +119,15 @@ body {
     color: #333;
     align-self: flex-start;
     border-bottom-left-radius: 8px;
+}
+
+/* 对话框里面的图片 */
+.message-bubble.bot img {
+    max-width: 100%;
+    border-radius: 8px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+    margin-top: 10px;
+    display: block;
 }
 
 /* 输入框和发送按钮 */
