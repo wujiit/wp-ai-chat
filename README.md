@@ -1,4 +1,4 @@
-这个插件一开始是为了验证deepseek，所以插件最早只支持deepseek，里面部分功能也是让deepseek自己写的，有问题可以找deepseek。让他自己优化。  
+这个插件一开始是为了验证deepseek，所以插件最早只支持deepseek，deepseek部分和文章总结的功能是deepseek写的。  
 
 
 
