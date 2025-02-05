@@ -96,7 +96,7 @@ body {
     background: #ffffff;
 }
 
-/* 消息气泡 */
+/* 消息气泡 开始 */
 .message-bubble {
     padding: 5px 15px;
     border-radius: 16px;
@@ -121,6 +121,68 @@ body {
     border-bottom-left-radius: 8px;
 }
 
+/* 代码块样式 */
+.message-bubble pre {
+    background: #2d2d2d;
+    color: #ffffff;
+    padding: 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-family: "Courier New", monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    max-width: 100%;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* 代码块中的代码标签 */
+.message-bubble pre code {
+    background: none;
+    color: inherit;
+    padding: 0;
+    border: none;
+}
+
+/* 表格样式 */
+.message-bubble table {
+    width: 100%;
+    border-collapse: collapse;
+    border-spacing: 0;
+    background: #ffffff;
+    border: 1px solid #ddd;
+    font-size: 14px;
+}
+
+/* 表头 */
+.message-bubble table th {
+    background: #f5f5f5;
+    font-weight: bold;
+    padding: 8px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+/* 表格内容 */
+.message-bubble table td {
+    padding: 8px;
+    border: 1px solid #ddd;
+}
+
+/* 响应式表格防止溢出 */
+.message-bubble table {
+    overflow-x: auto;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+/* 代码行高亮*/
+.message-bubble pre .hljs {
+    background: #2d2d2d !important;
+    color: #ffffff !important;
+}
+
+
 /* 对话框里面的图片 */
 .message-bubble.bot img {
     max-width: 100%;
@@ -129,6 +191,7 @@ body {
     margin-top: 10px;
     display: block;
 }
+/* 消息气泡 结束 */
 
 /* 输入框和发送按钮 */
 #deepseek-chat-input-container {
