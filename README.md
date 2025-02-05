@@ -1,14 +1,19 @@
-这个插件一开始是为了验证deepseek，所以插件最早只支持deepseek，deepseek部分和文章总结的功能是deepseek写的。  
+<img src="https://github.com/suqicloud/wp-ai-chat/blob/main/ic_logo.png" width="60">
+
+# 小半WordPress ai助手  
+
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.8.0-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/1.8)
 
 
+## 📌 项目简介
 
-插件名称：小半WordPress ai助手  
+适用于WordPress站点的ai对话插件。
 
-
-插件功能：  
+## 🚀 功能特性
 
 1.支持对接deepseek  
-2.可以选择DeepSeek-V3或者DeepSeek-R1模型  
+2.支持选择DeepSeek-V3或者DeepSeek-R1模型  
 3.支持对接豆包ai  
 4.可以自定义豆包ai文本类型的模型  
 5.支持对接通义千问  
@@ -23,26 +28,21 @@
 14.只允许登录用户使用  
 15.支持Markdown格式
 
-豆包只支持语言类模型。  
-通义千问内置支持：  
-qwen-max  
-qwen-plus  
-qwen-turbo  
-qwen-long  
-qwen-mt-plus（翻译）  
-qwen-mt-turbo（翻译）  
-qwen2.5-14b-instruct-1m  
-qwen2.5-1.5b-instruct（官方暂时完全免费）  
-wanx2.1-t2i-turbo图片生成  
-wanx2.1-t2i-plus图片生成  
+## 📥 安装
 
-marked.min.js文件用于解析Markdown格式。
+1. 下载最新版本文件。
+2. 进入WordPress插件后台
+3. 上传本地文件包安装
+
+或者直接上传到服务器的网站插件目录/wp-content/plugins也行，记得设置权限。
+
+开发基础：WordPress 6.7.1
+php版本：php 8.0
+
+## 🛠️ 使用方法
+
+插件启用会自动创建一个前台对话页面。如果没有自动创建，就自己手动加短代码：  [deepseek_chat]
 
 如果插件不用了，自己到数据库去删掉这个数据表：deepseek_chat_logs  
+
 主题页面需要支持全宽或者全屏模式，不然很狭窄。如果不支持就自己查看你主题的样式，通过代码实现deepseek助手页面全屏显示。  
-
-插件启用会自动创建一个前台对话页面。如果没有自动创建，就自己手动加短代码：  
-[deepseek_chat]
-
-插件截图预览：  
-![caed325b82bad34d242b327b1b101805.jpeg](https://i.miji.bid/2025/01/28/caed325b82bad34d242b327b1b101805.jpeg)
