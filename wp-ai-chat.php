@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结，可对接deepseek、通义千问、豆包模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 1.6
+Version: 1.8
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -56,7 +56,7 @@ function deepseek_create_chat_page() {
             'post_status'   => 'publish',
             'post_author'   => 1,
             'post_type'     => 'page',
-            'post_name'     => 'deepseek-chat'
+           // 'post_name'     => 'aichat'
         ));
     }
 }
@@ -108,10 +108,11 @@ function show_ai_helper_callback() {
 
 // 在网站前台显示AI助手入口
 function deepseek_display_ai_helper() {
-    if (get_option('show_ai_helper', '0') == '1') {
+    // 只在没有 [deepseek_chat] 短代码的页面显示入口
+    if (get_option('show_ai_helper', '0') == '1' && !is_page_with_deepseek_chat_shortcode()) {
         echo '<div id="ai-helper-button" style="
             position: fixed;
-            right: 20px;
+            right: 5%;
             bottom: 50%;
             transform: translateY(50%);
             z-index: 9999;
@@ -130,9 +131,17 @@ function deepseek_display_ai_helper() {
         ">
             <span style="font-size: 24px;">&#129503;</span> AI 助手
         </div>';
+
         echo '<script>
             document.getElementById("ai-helper-button").addEventListener("click", function() {
-                window.location.href = "' . get_permalink(get_page_by_path('deepseek-chat')) . '";
+                fetch("' . admin_url('admin-ajax.php') . '?action=get_deepseek_chat_page")
+                    .then(response => response.json())
+                    .then(data => {
+                        window.location.href = data.url;
+                    })
+                    .catch(() => {
+                        window.location.href = "' . home_url() . '";
+                    });
             });
 
             document.getElementById("ai-helper-button").addEventListener("mouseover", function() {
@@ -149,6 +158,41 @@ function deepseek_display_ai_helper() {
 }
 add_action('wp_footer', 'deepseek_display_ai_helper');
 
+// 检查页面是否包含 [deepseek_chat] 短代码 用于显示ai助手按钮
+function is_page_with_deepseek_chat_shortcode() {
+    global $post;
+
+    // 如果没有，直接返回 false
+    if (empty($post) || empty($post->post_content)) {
+        return false;
+    }
+
+    // 检查页面内容是否包含 [deepseek_chat] 短代码
+    return has_shortcode($post->post_content, 'deepseek_chat');
+}
+
+// 查找包含 [deepseek_chat] 短代码的页面 用于跳转对话页面
+function get_deepseek_chat_page() {
+    global $wpdb;
+    $page = $wpdb->get_row("
+        SELECT ID, post_title 
+        FROM $wpdb->posts 
+        WHERE post_type = 'page' 
+        AND post_status = 'publish' 
+        AND post_content LIKE '%[deepseek_chat]%' 
+        LIMIT 1
+    ");
+
+    if ($page) {
+        $url = get_permalink($page->ID);
+    } else {
+        $url = home_url(); // 默认跳转首页
+    }
+
+    wp_send_json(['url' => $url]);
+}
+add_action('wp_ajax_get_deepseek_chat_page', 'get_deepseek_chat_page');
+add_action('wp_ajax_nopriv_get_deepseek_chat_page', 'get_deepseek_chat_page');
 
 // 通义千问 API Key 输入框回调
 function qwen_api_key_callback() {
@@ -431,15 +475,20 @@ function get_deepseek_balance() {
 }
 
 // 加载CSS文件
-function deepseek_enqueue_styles() {
+function deepseek_enqueue_assets() {
     if (is_singular('page')) {
         global $post;
         if (has_shortcode($post->post_content, 'deepseek_chat')) { // 检查是否包含短代码
+            // 加载 CSS
             wp_enqueue_style('deepseek-chat-style', plugin_dir_url(__FILE__) . 'style.css');
+            
+            // 加载 marked.min.js
+            wp_enqueue_script('marked-js', plugin_dir_url(__FILE__) . 'marked.min.js', array(), null, true);
         }
     }
 }
-add_action('wp_enqueue_scripts', 'deepseek_enqueue_styles');
+add_action('wp_enqueue_scripts', 'deepseek_enqueue_assets');
+
 
 // 文章总结 开始
 // 文章发布时标记为需要生成文章总结
@@ -684,7 +733,14 @@ function deepseek_chat_shortcode() {
             <?php if (!empty($history)) : ?>
                 <?php foreach ($history as $log) : ?>
                     <li data-conversation-id="<?php echo $log->conversation_id; ?>">
-                        <span class="deepseek-chat-title"><?php echo esc_html(wp_trim_words($log->conversation_title, 6, '...')); ?></span>
+                        <span class="deepseek-chat-title">
+                           <?php 
+                               $title = mb_strlen($log->conversation_title, 'UTF-8') > 6 
+                                   ? mb_substr($log->conversation_title, 0, 6, 'UTF-8') . '...' 
+                                   : $log->conversation_title;
+                               echo esc_html($title);
+                              ?>
+                           </span>
                         <button class="deepseek-delete-log" data-conversation-id="<?php echo $log->conversation_id; ?>">删除</button>
                     </li>
                 <?php endforeach; ?>
@@ -697,6 +753,7 @@ function deepseek_chat_shortcode() {
         <!-- 消息框 -->
         <div id="deepseek-chat-messages">
             <!-- 初始为空，点击历史记录后动态加载 -->
+            <div class="message-bubble bot" id="chatbot-prompt">你好，我可以帮你写作、写文案、翻译，有问题请问我~</div>
         </div>
 
         <!-- 输入框和发送按钮 -->
@@ -707,7 +764,22 @@ function deepseek_chat_shortcode() {
     </div>
 </div>
 <script>
-    var currentConversationId = null; // 当前对话的conversation_id
+    // 将Markdown文本转换为HTML
+    function convertMarkdownToHTML(markdownText) {
+        // 使用Marked库进行转换
+        return marked.parse(markdownText);
+    }
+</script>
+<script>
+    var currentConversationId = null; // 当前对话的id
+    
+// 默认提示    
+document.getElementById('deepseek-chat-input').addEventListener('input', function() {
+    var prompt = document.getElementById('chatbot-prompt');
+    if (prompt) {
+        prompt.style.display = 'none'; // 隐藏提示消息
+    }
+});
 
 // 发送消息
 document.getElementById('deepseek-chat-send').addEventListener('click', function() {
@@ -797,18 +869,20 @@ document.getElementById('deepseek-chat-send').addEventListener('click', function
                     botMessageContainer.innerHTML = '';  // 初始为空，逐字填充
                     messagesContainer.appendChild(botMessageContainer);
 
-                    // 实现逐字显示效果
-                    var botReply = data.message;
+                    // textContent追加原始字符，避免HTML转义
+                    var botReply = data.message; // 确保返回的是纯 Markdown 格式文本
                     var index = 0;
-
-                    // 设置打字的间隔时间
                     var typingSpeed = 100; // 控制打字速度
 
                     function typeWriter() {
                         if (index < botReply.length) {
-                            botMessageContainer.innerHTML += botReply.charAt(index); // 逐字添加
+                        // 使用 textContent 累加字符，防止浏览器提前解析HTML标签
+                            botMessageContainer.textContent += botReply.charAt(index);
                             index++;
-                            setTimeout(typeWriter, typingSpeed); // 延时调用，模拟逐字输入
+                            setTimeout(typeWriter, typingSpeed);
+                        } else {
+                        // 打字结束后，将容器内的 Markdown 文本转换为 HTML 并更新显示
+                            botMessageContainer.innerHTML = convertMarkdownToHTML(botReply);
                         }
                     }
 
@@ -962,7 +1036,8 @@ function typeWriter(text, container, callback) {
         currentConversationId = null; // 重置当前对话的conversation_id
     });
 
-    // 加载历史对话记录
+
+    //加载历史对话记录时的内容渲染
     function loadChatLog(conversationId) {
         fetch('<?php echo admin_url('admin-ajax.php'); ?>?action=deepseek_load_log&conversation_id=' + conversationId)
         .then(response => response.json())
@@ -971,13 +1046,16 @@ function typeWriter(text, container, callback) {
                 var messagesContainer = document.getElementById('deepseek-chat-messages');
                 messagesContainer.innerHTML = ''; // 清空当前内容
                 data.messages.forEach(message => {
+                // 用户消息直接显示（如果需要也可转换）
                     messagesContainer.innerHTML += '<div class="message-bubble user">' + message.message + '</div>';
-                    messagesContainer.innerHTML += '<div class="message-bubble bot">' + message.response + '</div>';
+                    // AI 回复内容先调用转换函数，将纯 Markdown 转换成 HTML
+                    messagesContainer.innerHTML += '<div class="message-bubble bot">' + convertMarkdownToHTML(message.response) + '</div>';
                 });
-                currentConversationId = conversationId; // 设置当前对话的conversation_id
+                currentConversationId = conversationId; // 设置当前对话的 conversation_id
             }
         });
     }
+
 
     // 绑定历史对话框的点击事件
     document.querySelectorAll('#deepseek-chat-history li').forEach(item => {
@@ -1027,7 +1105,16 @@ function deepseek_send_message() {
     $conversation_id = isset($_POST['conversation_id']) ? intval($_POST['conversation_id']) : null;
     $user_id = get_current_user_id();
     $interface_choice = get_option('chat_interface_choice', 'deepseek');
-    
+
+    /*
+    $limit = 5;
+    if (mb_strlen($message, 'UTF-8') > $limit) {
+        $title = mb_substr($message, 0, $limit, 'UTF-8') . '...';
+    } else {
+        $title = $message;
+    }存储标题的时候截取 
+    */
+
     // 判断是否是图片生成模型
     $is_image_model = in_array(get_option('qwen_model'), ['wanx2.1-t2i-turbo', 'wanx2.1-t2i-plus']);
 
@@ -1071,7 +1158,8 @@ function deepseek_send_message() {
             $wpdb->insert($table_name, [
                 'user_id' => $user_id,
                 'conversation_id' => $conversation_id ?: 0,
-                'conversation_title' => wp_trim_words($message, 5),
+                'conversation_title'  => $message,
+                //'conversation_title'  => $title, // 存储的时候截取
                 'message' => $message,
                 'response' => json_encode([
                     'task_id' => $task_id,
@@ -1095,7 +1183,7 @@ function deepseek_send_message() {
                 'is_image' => true,
                 'task_id' => $task_id,
                 'conversation_id' => $conversation_id,
-                'conversation_title' => wp_trim_words($message, 5)
+                'conversation_title'  => $message,
             ]);
         } else {
             wp_send_json([
@@ -1170,13 +1258,13 @@ function deepseek_send_message() {
 
         if ($http_code == 200) {
             $response_data = json_decode($response, true);
-            $reply = nl2br($response_data['choices'][0]['message']['content']);
+            $reply = $response_data['choices'][0]['message']['content'];
 
             // 保存对话记录
             $wpdb->insert($table_name, [
                 'user_id' => $user_id,
                 'conversation_id' => $conversation_id ?: 0,
-                'conversation_title' => $conversation_id ? '' : wp_trim_words($message, 5),
+                'conversation_title' => $conversation_id ? '' : $message,
                 'message' => $message,
                 'response' => $reply
             ]);
@@ -1194,7 +1282,7 @@ function deepseek_send_message() {
                 'success' => true, 
                 'message' => $reply,
                 'conversation_id' => $conversation_id,
-                'conversation_title' => wp_trim_words($message, 5)
+                'conversation_title'  => $message,
             ]);
         } else {
             wp_send_json([
@@ -1285,7 +1373,7 @@ function deepseek_load_log() {
         "SELECT * FROM $table_name 
         WHERE conversation_id = %d 
         AND user_id = %d 
-        ORDER BY id ASC",  // 按id排序保证对话顺序
+        ORDER BY id ASC",
         $conversation_id,
         $user_id
     ));
@@ -1305,20 +1393,20 @@ function deepseek_load_log() {
             $html = '<div class="image-prompt">'.esc_html($response['actual_prompt']).'</div>';
             $html .= '<img src="'.esc_url($response['image_url']).'" style="max-width:100%;height:auto;" />';
             $processed[] = array(
-                'message' => esc_html($log->message),
+                'message'  => esc_html($log->message),
                 'response' => $html
             );
         } else {
-            // 处理文本消息
+            // 处理文本消息直接返回原始Markdown格式文本
             $processed[] = array(
-                'message' => esc_html($log->message),
-                'response' => nl2br(esc_html($log->response))
+                'message'  => $log->message,
+                'response' => $log->response
             );
         }
     }
 
     wp_send_json([
-        'success' => true, 
+        'success'  => true, 
         'messages' => $processed
     ]);
 }
@@ -1390,7 +1478,7 @@ function deepseek_render_logs_page() {
                     <?php foreach ($logs as $log) : ?>
                         <tr>
                             <td><?php echo $log->user_id; ?></td>
-                            <td><?php echo esc_html(wp_trim_words($log->conversation_title, 5, '...')); ?></td>
+                            <td><?php echo esc_html($log->conversation_title); ?></td>
                             <td><?php echo $log->created_at; ?></td>
                             <td>
                                 <a href="?page=deepseek-logs&delete_log=<?php echo $log->id; ?>" class="button">删除</a>
