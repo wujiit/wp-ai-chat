@@ -209,8 +209,6 @@ function qwen_model_callback() {
         <option value="qwen-plus" <?php selected($model, 'qwen-plus'); ?>>qwen-plus</option>
         <option value="qwen-turbo" <?php selected($model, 'qwen-turbo'); ?>>qwen-turbo</option>
         <option value="qwen-long" <?php selected($model, 'qwen-long'); ?>>qwen-long</option>
-        <option value="qwen-mt-plus" <?php selected($model, 'qwen-mt-plus'); ?>>qwen-mt-plus</option>
-        <option value="qwen-mt-turbo" <?php selected($model, 'qwen-mt-turbo'); ?>>qwen-mt-turbo</option>
         <option value="qwen2.5-14b-instruct-1m" <?php selected($model, 'qwen2.5-14b-instruct-1m'); ?>>qwen2.5-14b-instruct-1m</option>
         <option value="qwen2.5-1.5b-instruct" <?php selected($model, 'qwen2.5-1.5b-instruct'); ?>>qwen2.5-1.5b-instruct</option>
         <option value="wanx2.1-t2i-turbo" <?php selected($model, 'wanx2.1-t2i-turbo'); ?>>wanx2.1-t2i-turbo图片生成</option>
