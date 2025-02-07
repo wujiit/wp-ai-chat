@@ -13,7 +13,7 @@
 ## 🚀 功能特性
 
 1.支持对接deepseek  
-2.支持选择DeepSeek-V3或者DeepSeek-R1模型  
+2.支持选择DeepSeek-V3、DeepSeek-R1模型
 3.支持对接豆包ai  
 4.可以自定义豆包ai文本类型的模型  
 5.支持对接通义千问  
@@ -27,6 +27,7 @@
 13.前台显示一个ai助手入口  
 14.只允许登录用户使用  
 15.支持Markdown格式
+16.DeepSeek余额信息
 
 ## 📥 安装
 
