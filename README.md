@@ -2,7 +2,7 @@
 
 # 小半WordPress ai助手  
 
-[![License](https://img.shields.io/badge/license-GPL-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.8.0-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/1.8)
 
 
