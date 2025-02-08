@@ -55,3 +55,6 @@ php版本：php 8.0
 如果插件不用了，自己到数据库去删掉这个数据表：deepseek_chat_logs  
 
 主题页面需要支持全宽或者全屏模式，不然很狭窄。如果不支持就自己查看你主题的样式，通过代码实现deepseek助手页面全屏显示。  
+
+
+![WordPressai.png](https://github.com/suqicloud/wp-ai-chat/blob/main/2025020801.jpg)
