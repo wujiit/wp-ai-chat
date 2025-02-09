@@ -35,7 +35,7 @@ jQuery(document).ready(function($) {
                 btn.text(language);
             },
             error: function() {
-                messageContainer.text('请求错误，请重试。');
+                messageContainer.text('请求错误，请重试，内容太多暂时无法翻译，请使用其他网页翻译方式。');
                 btn.text(language);
             }
         });
