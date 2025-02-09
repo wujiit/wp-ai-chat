@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结，可对接deepseek、通义千问、豆包模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 1.8
+Version: 2.0
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -35,6 +35,8 @@ function deepseek_create_table() {
     dbDelta($sql);
 }
 register_activation_hook(__FILE__, 'deepseek_create_table');
+
+require_once plugin_dir_path(__FILE__) . 'wptranslate.php';
 
 // 插件列表页面添加设置入口
 function deepseek_add_settings_link($links) {
@@ -74,6 +76,8 @@ function deepseek_register_settings() {
 
     register_setting('deepseek_chat_options_group', 'show_ai_helper'); // ai助手显示
     register_setting('deepseek_chat_options_group', 'enable_ai_summary'); // 文章总结
+    // 新增：AI对话语音朗读功能设置项
+    register_setting('deepseek_chat_options_group', 'enable_ai_voice_reading');
 
     add_settings_section('deepseek_main_section', '基础设置', null, 'deepseek-chat');
 
@@ -97,8 +101,17 @@ function deepseek_register_settings() {
 
     // ai入口
     add_settings_field('show_ai_helper', '网站前台显示AI助手入口', 'show_ai_helper_callback', 'deepseek-chat', 'deepseek_main_section');
+
+    // 新增：AI对话语音朗读设置项
+    add_settings_field('enable_ai_voice_reading', 'AI对话语音朗读', 'enable_ai_voice_reading_callback', 'deepseek-chat', 'deepseek_main_section');
 }
 add_action('admin_init', 'deepseek_register_settings');
+
+// 回调函数：渲染“AI对话语音朗读”复选框
+function enable_ai_voice_reading_callback() {
+    $checked = get_option('enable_ai_voice_reading', '0');
+    echo '<input type="checkbox" name="enable_ai_voice_reading" value="1" ' . checked(1, $checked, false) . ' />';
+}
 
 // 助手入口处理回调
 function show_ai_helper_callback() {
@@ -209,6 +222,8 @@ function qwen_model_callback() {
         <option value="qwen-plus" <?php selected($model, 'qwen-plus'); ?>>qwen-plus</option>
         <option value="qwen-turbo" <?php selected($model, 'qwen-turbo'); ?>>qwen-turbo</option>
         <option value="qwen-long" <?php selected($model, 'qwen-long'); ?>>qwen-long</option>
+        <option value="qwen-mt-plus" <?php selected($model, 'qwen-mt-plus'); ?>>qwen-mt-plus</option>
+        <option value="qwen-mt-turbo" <?php selected($model, 'qwen-mt-turbo'); ?>>qwen-mt-turbo</option>
         <option value="qwen2.5-14b-instruct-1m" <?php selected($model, 'qwen2.5-14b-instruct-1m'); ?>>qwen2.5-14b-instruct-1m</option>
         <option value="qwen2.5-1.5b-instruct" <?php selected($model, 'qwen2.5-1.5b-instruct'); ?>>qwen2.5-1.5b-instruct</option>
         <option value="wanx2.1-t2i-turbo" <?php selected($model, 'wanx2.1-t2i-turbo'); ?>>wanx2.1-t2i-turbo图片生成</option>
@@ -281,7 +296,7 @@ function deepseek_add_menu() {
     add_submenu_page(
         'deepseek', // 父菜单slug
         'AI参数设置', // 页面标题
-        '设置', // 菜单标题
+        '对话设置', // 菜单标题
         'manage_options',
         'deepseek', // 菜单slug和主菜单一致
         'deepseek_render_settings_page' // 指向设置页面的回调函数
@@ -303,7 +318,17 @@ function deepseek_add_menu() {
         'manage_options',
         'deepseek-article-generator',
         'deepseek_render_article_generator_page' // 文章生成页面回调函数
-    );    
+    );
+    // 子菜单项 - 文章 AI 翻译
+    add_submenu_page(
+        'deepseek', // 父菜单slug
+        '翻译朗读', // 页面标题
+        '翻译朗读', // 菜单标题
+        'manage_options',
+        'deepseek-translate', // 菜单slug
+        'wpatai_settings_page' // 指向翻译插件的设置页面回调函数
+    );
+    
 }
 add_action('admin_menu', 'deepseek_add_menu');
 
@@ -688,12 +713,12 @@ function deepseek_output_inline_styles() {
                         if (i < summaryText.length) {
                             aiSummaryContent.innerHTML += summaryText.charAt(i);
                             i++;
-                            setTimeout(typeSummary, typingSpeed);
+                            requestAnimationFrame(typeSummary, typingSpeed);
                         }
                     }
 
                     // 页面加载完后再开始打字效果
-                    setTimeout(typeSummary, 300); // 延时300ms开始
+                    requestAnimationFrame(typeSummary, 300); // 延时300ms开始
                 }
             });
         </script>
@@ -767,6 +792,7 @@ function deepseek_chat_shortcode() {
         // 使用Marked库进行转换
         return marked.parse(markdownText);
     }
+    var aiVoiceEnabled = <?php echo get_option('enable_ai_voice_reading', '0'); ?>;
 </script>
 <script>
     var currentConversationId = null; // 当前对话的id
@@ -877,15 +903,89 @@ document.getElementById('deepseek-chat-send').addEventListener('click', function
                         // 使用 textContent 累加字符，防止浏览器提前解析HTML标签
                             botMessageContainer.textContent += botReply.charAt(index);
                             index++;
-                            setTimeout(typeWriter, typingSpeed);
+                            requestAnimationFrame(typeWriter, typingSpeed);
                         } else {
                         // 打字结束后，将容器内的 Markdown 文本转换为 HTML 并更新显示
                             botMessageContainer.innerHTML = convertMarkdownToHTML(botReply);
-                        }
-                    }
+            // 如果启用了语音朗读，则追加自定义样式的播放图标（使用 <span>）
+            if (aiVoiceEnabled) {
+                var playIcon = document.createElement('span');
+                playIcon.classList.add('ai-tts-play');
+                // 初始显示播放图标（可使用 HTML 实体或自定义图标）
+                playIcon.innerHTML = '&#128266;'; // 扬声器图标
+                playIcon.style.marginLeft = '10px';
 
-                    // 启动打字效果
-                    typeWriter();
+                // 点击事件：第一次点击调用 AJAX 生成语音，并实现播放/暂停切换
+                playIcon.addEventListener('click', function() {
+                    // 获取或创建用于播放音频的 <audio> 元素
+                    var audioElem = document.getElementById('ai-tts-audio');
+                    if (!audioElem) {
+                        audioElem = document.createElement('audio');
+                        audioElem.id = 'ai-tts-audio';
+                        audioElem.style.display = 'none';
+                        document.body.appendChild(audioElem);
+                    }
+                    // 如果已缓存音频 URL，则切换播放/暂停
+                    if (audioElem.audioUrls) {
+                        if (!audioElem.paused) {
+                            audioElem.pause();
+                            playIcon.innerHTML = '&#128264;'; // 暂停状态图标（可自定义）
+                        } else {
+                            audioElem.play();
+                            playIcon.innerHTML = '&#128266;';
+                        }
+                        return;
+                    }
+                    // 第一次点击时调用 AJAX 接口生成语音（分段处理）
+                    var dataParams = new URLSearchParams();
+                    dataParams.append('action', 'deepseek_tts');
+                    dataParams.append('text', botReply);
+                    fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: dataParams
+                    })
+                    .then(response => response.json())
+                    .then(ttsData => {
+                        if (ttsData.success) {
+                            var audio_urls = ttsData.data.audio_urls;
+                            if (audio_urls && audio_urls.length > 0) {
+                                // 缓存返回的音频 URL 数组到 audioElem，并初始化播放索引
+                                audioElem.audioUrls = audio_urls;
+                                audioElem.currentIndex = 0;
+                                audioElem.src = audio_urls[0];
+                                audioElem.play();
+                                playIcon.innerHTML = '&#128266;';
+                                // 依次播放所有分段语音
+                                audioElem.onended = function() {
+                                    audioElem.currentIndex++;
+                                    if (audioElem.currentIndex < audio_urls.length) {
+                                        audioElem.src = audio_urls[audioElem.currentIndex];
+                                        audioElem.play();
+                                    } else {
+                                        // 播放完毕后清除缓存，恢复播放图标
+                                        delete audioElem.audioUrls;
+                                        audioElem.currentIndex = 0;
+                                        playIcon.innerHTML = '&#128266;';
+                                    }
+                                };
+                            }
+                        } else {
+                            alert('语音朗读失败：' + ttsData.data);
+                        }
+                    })
+                    .catch(function(){
+                        alert('请求错误，请重试。');
+                    });
+                });
+                // 将自定义的语音播放图标添加到 AI 回复的容器中
+                botMessageContainer.appendChild(playIcon);
+            }
+        }
+    }
+    typeWriter();
 
                     // 清空输入框
                     document.getElementById('deepseek-chat-input').value = '';
@@ -994,7 +1094,7 @@ function handleImageGeneration(taskId) {
                     if (index < actualPrompt.length) {
                         promptContainer.innerHTML += actualPrompt.charAt(index); // 逐字添加
                         index++;
-                        setTimeout(typeWriter, typingSpeed); // 延时调用自己，模拟逐字输入
+                        requestAnimationFrame(typeWriter, typingSpeed); // 延时调用自己，模拟逐字输入
                     }
                 }
 
@@ -1018,7 +1118,7 @@ function typeWriter(text, container, callback) {
         if (i < text.length) {
             container.innerHTML += text.charAt(i);
             i++;
-            setTimeout(addChar, speed);
+            requestAnimationFrame(addChar, speed);
         } else if (callback) {
             callback();
         }
@@ -1753,4 +1853,39 @@ function deepseek_publish_article_ajax() {
 add_action('wp_ajax_publish_article_ajax', 'deepseek_publish_article_ajax');
 add_action('wp_ajax_nopriv_publish_article_ajax', 'deepseek_publish_article_ajax');
 // 文章生成 结束
+
+
+// 处理AI对话语音朗读的TTS请求
+function deepseek_tts() {
+    $text = isset($_POST['text']) ? wp_strip_all_tags($_POST['text']) : '';
+    if ( empty($text) ) {
+        wp_send_json_error('文本为空');
+    }
+
+    // 每50个字符一段
+    $segment_length = 50;
+    $segments = array();
+    $text_length = mb_strlen($text, 'UTF-8');
+    for ($i = 0; $i < $text_length; $i += $segment_length) {
+        $segments[] = mb_substr($text, $i, $segment_length, 'UTF-8');
+    }
+
+    // 从 wpatai_settings 中读取语音合成接口设置
+    $options = get_option('wpatai_settings');
+    $interface = isset($options['tts_interface']) ? $options['tts_interface'] : 'tencent';
+
+    $audio_urls = array();
+    // 按分段调用 wpatai_generate_tts_audio 进行语音合成
+    foreach ($segments as $segment) {
+        $audio_url = wpatai_generate_tts_audio( $segment, $interface );
+        if ( is_wp_error($audio_url) ) {
+            wp_send_json_error( $audio_url->get_error_message() );
+        }
+        $audio_urls[] = $audio_url;
+    }
+    wp_send_json_success( array('audio_urls' => $audio_urls) );
+}
+add_action('wp_ajax_deepseek_tts', 'deepseek_tts');
+add_action('wp_ajax_nopriv_deepseek_tts', 'deepseek_tts');
+
 ?>

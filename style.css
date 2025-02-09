@@ -278,6 +278,23 @@ body {
     font-style: italic;
 }
 
+ /* ai对话框语音朗读按钮 */
+.ai-tts-play {
+    display: inline-block;
+    padding: 5px 10px;
+    background-color: #267ad1;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    text-align: center;
+    line-height: 1;
+}
+.ai-tts-play:hover {
+    background-color: #005177;
+}
+
 /* 响应式优化 */
 @media (max-width: 768px) {
     #deepseek-chat-container {
