@@ -1466,8 +1466,9 @@ function deepseek_send_message_rest( WP_REST_Request $request ) {
         exit();
     }
 }
-add_action('wp_ajax_deepseek_send_message', 'deepseek_send_message');
-add_action('wp_ajax_nopriv_deepseek_send_message', 'deepseek_send_message');
+//add_action('wp_ajax_deepseek_send_message', 'deepseek_send_message_rest');
+//add_action('wp_ajax_nopriv_deepseek_send_message', 'deepseek_send_message_rest');
+
 add_action('rest_api_init', function () {
     register_rest_route('deepseek/v1', '/send-message', array(
         'methods' => 'POST',
