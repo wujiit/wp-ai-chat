@@ -278,6 +278,35 @@ body {
     font-style: italic;
 }
 
+/* 自定义提示词板块样式 */
+#deepseek-custom-prompts {
+    /* background: linear-gradient(135deg, #f0f4f8, #d9e2ec); */
+    /* border: 1px solid #bcccdc; */
+    padding: 15px;
+    margin-top: 15px;
+    border-radius: 8px;
+    text-align: center;
+    /* box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); */
+}
+
+#deepseek-custom-prompts .deepseek-prompt {
+    display: inline-block;
+    background: #4a90e2;
+    color: #fff;
+    padding: 8px 16px;
+    margin: 6px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: background 0.3s ease, transform 0.3s ease;
+    font-size: 14px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+#deepseek-custom-prompts .deepseek-prompt:hover {
+    background: #357ab8;
+    transform: translateY(-2px);
+}
+
  /* ai对话框语音朗读按钮 */
 .ai-tts-play {
     display: inline-block;

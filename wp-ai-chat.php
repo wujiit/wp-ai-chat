@@ -1,9 +1,9 @@
 <?php
 /*
 Plugin Name: 小半WordPress ai助手
-Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结，可对接deepseek、通义千问、豆包模型。
+Description: WordPress Ai助手插件，支持对话聊天、文章生成、总结、翻译、朗读，可对接deepseek、通义千问、豆包模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 2.2
+Version: 2.5
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -64,6 +64,58 @@ function deepseek_create_chat_page() {
 }
 register_activation_hook(__FILE__, 'deepseek_create_chat_page');
 
+// 添加菜单入口
+function deepseek_add_menu() {
+    // 主菜单项
+    add_menu_page(
+        '小半Ai助手', // 页面标题
+        '小半Ai助手', // 菜单标题
+        'manage_options',
+        'deepseek', // 菜单slug
+        'deepseek_render_settings_page', // 默认加载设置页面
+        'dashicons-format-chat', // 图标
+        6 // 菜单位置
+    );
+    // 子菜单项 - 设置
+    add_submenu_page(
+        'deepseek', // 父菜单slug
+        'AI参数设置', // 页面标题
+        '对话设置', // 菜单标题
+        'manage_options',
+        'deepseek', // 菜单slug和主菜单一致
+        'deepseek_render_settings_page' // 指向设置页面的回调函数
+    );
+    // 子菜单项 - 对话记录
+    add_submenu_page(
+        'deepseek',
+        'Ai对话记录',
+        '对话记录',
+        'manage_options',
+        'deepseek-logs',
+        'deepseek_render_logs_page' // 对话记录页面的回调函数
+    );
+    // 子菜单项 - 文章生成
+    add_submenu_page(
+        'deepseek',
+        '文章生成',
+        '文章生成',
+        'manage_options',
+        'deepseek-article-generator',
+        'deepseek_render_article_generator_page' // 文章生成页面回调函数
+    );
+    // 子菜单项 - 翻译朗读
+    add_submenu_page(
+        'deepseek',
+        '翻译朗读',
+        '翻译朗读',
+        'manage_options',
+        'deepseek-translate',
+        'wpatai_settings_page' // 翻译页面回调函数
+    );
+    
+}
+add_action('admin_menu', 'deepseek_add_menu');
+
 // 注册设置
 function deepseek_register_settings() {
     register_setting('deepseek_chat_options_group', 'deepseek_api_key'); // DeepSeek API Key
@@ -79,17 +131,19 @@ function deepseek_register_settings() {
 
     register_setting('deepseek_chat_options_group', 'enable_ai_voice_reading'); // AI对话语音朗读
 
+    register_setting('deepseek_chat_options_group', 'deepseek_custom_prompts'); // 自定义提示词
+
     add_settings_section('deepseek_main_section', '基础设置', null, 'deepseek-chat');
 
-    // DeepSeek 配置项
+    // DeepSeek配置项
     add_settings_field('deepseek_api_key', 'DeepSeek API Key', 'deepseek_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
     add_settings_field('deepseek_model', 'DeepSeek 模型', 'deepseek_model_callback', 'deepseek-chat', 'deepseek_main_section');
 
-    // 豆包AI 配置项
+    // 豆包AI配置项
     add_settings_field('doubao_api_key', '豆包AI API Key', 'doubao_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
     add_settings_field('doubao_model', '豆包AI 模型参数', 'doubao_model_callback', 'deepseek-chat', 'deepseek_main_section');
 
-    // 通义千问 配置项
+    // 通义千问配置项
     add_settings_field('qwen_api_key', '通义千问 API Key', 'qwen_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
     add_settings_field('qwen_model', '通义千问 模型选择', 'qwen_model_callback', 'deepseek-chat', 'deepseek_main_section');
 
@@ -104,13 +158,28 @@ function deepseek_register_settings() {
 
     // AI对话语音朗读
     add_settings_field('enable_ai_voice_reading', 'AI对话语音朗读', 'enable_ai_voice_reading_callback', 'deepseek-chat', 'deepseek_main_section');
+
+    // 自定义提示词
+    add_settings_field('deepseek_custom_prompts', '自定义提示词', 'deepseek_custom_prompts_callback', 'deepseek-chat', 'deepseek_main_section');
 }
 add_action('admin_init', 'deepseek_register_settings');
+
+// 自定义提示词回调函数
+function deepseek_custom_prompts_callback() {
+    $prompts = get_option('deepseek_custom_prompts', '');
+    echo '<textarea name="deepseek_custom_prompts" rows="5" cols="60" placeholder="每行一个提示词 可以不写">' . esc_textarea($prompts) . '</textarea>';
+}
 
 // AI对话语音朗读函数回调
 function enable_ai_voice_reading_callback() {
     $checked = get_option('enable_ai_voice_reading', '0');
     echo '<input type="checkbox" name="enable_ai_voice_reading" value="1" ' . checked(1, $checked, false) . ' />';
+}
+
+// 文章AI总结复选框回调
+function enable_ai_summary_callback() {
+    $enable_ai_summary = get_option('enable_ai_summary');
+    echo '<input type="checkbox" name="enable_ai_summary" value="1" ' . checked(1, $enable_ai_summary, false) . ' />';
 }
 
 // 助手入口处理函数回调
@@ -175,7 +244,7 @@ add_action('wp_footer', 'deepseek_display_ai_helper');
 function is_page_with_deepseek_chat_shortcode() {
     global $post;
 
-    // 如果没有，直接返回 false
+    // 如果没有，直接返回false
     if (empty($post) || empty($post->post_content)) {
         return false;
     }
@@ -207,7 +276,7 @@ function get_deepseek_chat_page() {
 add_action('wp_ajax_get_deepseek_chat_page', 'get_deepseek_chat_page');
 add_action('wp_ajax_nopriv_get_deepseek_chat_page', 'get_deepseek_chat_page');
 
-// 通义千问 API Key 输入框回调
+// 通义千问API Key输入框回调
 function qwen_api_key_callback() {
     $api_key = get_option('qwen_api_key');
     echo '<input type="text" name="qwen_api_key" value="' . esc_attr($api_key) . '" style="width: 500px;" />';
@@ -215,7 +284,7 @@ function qwen_api_key_callback() {
 
 // 通义千问 模型选择框回调
 function qwen_model_callback() {
-    $model = get_option('qwen_model', 'qwen-max'); // 默认模型为 qwen-max
+    $model = get_option('qwen_model', 'qwen-max'); // 默认模型为qwen-max
     ?>
     <select name="qwen_model">
         <option value="qwen-max" <?php selected($model, 'qwen-max'); ?>>qwen-max</option>
@@ -250,7 +319,7 @@ function deepseek_api_key_callback() {
     echo '<input type="text" name="deepseek_api_key" value="' . esc_attr($api_key) . '" style="width: 500px;" />';
 }
 
-// deepseek 模型函数回调
+// deepseek模型函数回调
 function deepseek_model_callback() {
     $model = get_option('deepseek_model', 'deepseek-chat'); // 默认模型为deepseek-chat
     ?>
@@ -273,63 +342,6 @@ function chat_interface_choice_callback() {
     <?php
 }
 
-// 文章AI总结复选框回调
-function enable_ai_summary_callback() {
-    $enable_ai_summary = get_option('enable_ai_summary');
-    echo '<input type="checkbox" name="enable_ai_summary" value="1" ' . checked(1, $enable_ai_summary, false) . ' />';
-}
-
-// 添加菜单入口
-function deepseek_add_menu() {
-    // 主菜单项
-    add_menu_page(
-        '小半Ai助手', // 页面标题
-        '小半Ai助手', // 菜单标题
-        'manage_options',
-        'deepseek', // 菜单slug
-        'deepseek_render_settings_page', // 默认加载设置页面
-        'dashicons-format-chat', // 图标
-        6 // 菜单位置
-    );
-    // 子菜单项 - 设置
-    add_submenu_page(
-        'deepseek', // 父菜单slug
-        'AI参数设置', // 页面标题
-        '对话设置', // 菜单标题
-        'manage_options',
-        'deepseek', // 菜单slug和主菜单一致
-        'deepseek_render_settings_page' // 指向设置页面的回调函数
-    );
-    // 子菜单项 - 对话记录
-    add_submenu_page(
-        'deepseek',
-        'Ai对话记录',
-        '对话记录',
-        'manage_options',
-        'deepseek-logs',
-        'deepseek_render_logs_page' // 对话记录页面的回调函数
-    );
-    // 子菜单项 - 文章生成
-    add_submenu_page(
-        'deepseek',
-        '文章生成',
-        '文章生成',
-        'manage_options',
-        'deepseek-article-generator',
-        'deepseek_render_article_generator_page' // 文章生成页面回调函数
-    );
-    // 子菜单项 - 翻译朗读
-    add_submenu_page(
-        'deepseek',
-        '翻译朗读',
-        '翻译朗读',
-        'manage_options',
-        'deepseek-translate',
-        'wpatai_settings_page' // 翻译页面回调函数
-    );
-    
-}
-add_action('admin_menu', 'deepseek_add_menu');
 
 // 设置页面
 function deepseek_render_settings_page() {
@@ -496,235 +508,20 @@ function get_deepseek_balance() {
     return false;
 }
 
-// 加载CSS文件
+// 加载前台CSS文件
 function deepseek_enqueue_assets() {
     if (is_singular('page')) {
         global $post;
         if (has_shortcode($post->post_content, 'deepseek_chat')) { // 检查是否包含短代码
-            // 加载 CSS
+            // 加载CSS
             wp_enqueue_style('deepseek-chat-style', plugin_dir_url(__FILE__) . 'style.css');
             
-            // 加载 marked.min.js
+            // 加载marked.min.js
             wp_enqueue_script('marked-js', plugin_dir_url(__FILE__) . 'marked.min.js', array(), null, true);
         }
     }
 }
 add_action('wp_enqueue_scripts', 'deepseek_enqueue_assets');
-
-
-// 文章总结 开始
-// 文章发布时标记为需要生成文章总结
-function deepseek_mark_post_for_summary($post_id, $post, $update) {
-    if (!get_option('enable_ai_summary') || $post->post_status !== 'publish' || wp_is_post_revision($post_id)) {
-        return;
-    }
-
-    update_post_meta($post_id, '_needs_ai_summary', 1);
-}
-add_action('wp_after_insert_post', 'deepseek_mark_post_for_summary', 10, 3);
-
-// 文章第一次访问时生成总结
-function deepseek_generate_summary_on_first_visit() {
-    if (!get_option('enable_ai_summary') || !is_single()) {
-        return;
-    }
-
-    $post_id = get_the_ID();
-    if (!get_post_meta($post_id, '_needs_ai_summary', true)) {
-        return;
-    }
-
-    $post = get_post($post_id);
-    $content = $post->post_content;
-
-    // 调用AI接口生成总结
-    $summary = deepseek_call_ai_api($content);
-
-    if ($summary) {
-        update_post_meta($post_id, '_ai_summary', $summary);
-        delete_post_meta($post_id, '_needs_ai_summary');
-    }
-}
-add_action('template_redirect', 'deepseek_generate_summary_on_first_visit');
-
-// 调用AI接口生成文章总结
-function deepseek_call_ai_api($content) {
-    $api_key = '';
-    $model = '';
-    $url = '';
-
-    // 根据选择的接口设置API Key、模型和URL
-    $interface_choice = get_option('chat_interface_choice');
-    switch ($interface_choice) {
-        case 'deepseek':
-            $api_key = get_option('deepseek_api_key');
-            $model = get_option('deepseek_model');
-            $url = 'https://api.deepseek.com/chat/completions';
-            break;
-        case 'doubao':
-            $api_key = get_option('doubao_api_key');
-            $model = get_option('doubao_model');
-            $url = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
-            break;
-        case 'qwen':
-            $api_key = get_option('qwen_api_key');
-            $model = get_option('qwen_model');
-            $url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
-            break;
-    }
-
-    // 构建请求数据
-    $data = array(
-        'model' => $model,
-        'messages' => array(
-            array(
-                'role' => 'system',
-                'content' => 'You are a helpful assistant.'
-            ),
-            array(
-                'role' => 'user',
-                'content' => '请为以下文章生成一句话总结，总结不要超过50个字，不要添加任何前缀或标题：' . $content
-            )
-        )
-    );
-
-    // 发送请求
-    $response = wp_remote_post($url, array(
-        'headers' => array(
-            'Content-Type' => 'application/json',
-            'Authorization' => 'Bearer ' . $api_key
-        ),
-        'body' => json_encode($data)
-    ));
-
-    // 记录错误日志
-    if (is_wp_error($response)) {
-        error_log('AI 接口请求失败：' . $response->get_error_message());
-        return false;
-    }
-
-    $body = wp_remote_retrieve_body($response);
-    $result = json_decode($body, true);
-
-    if (isset($result['choices'][0]['message']['content'])) {
-        // 移除可能的前缀
-        $summary = trim($result['choices'][0]['message']['content']);
-        $summary = preg_replace('/^(摘要|总结|文章摘要|摘要：|文章摘要：)\s*/', '', $summary);
-        return $summary;
-    }
-
-    // 记录API返回错误日志
-    error_log('AI 接口返回结果异常：' . print_r($result, true));
-    return false;
-}
-
-// 在前台文章页面插入总结
-function deepseek_display_ai_summary($content) {
-    if (!get_option('enable_ai_summary') || !is_single()) {
-        return $content;
-    }
-
-    $post_id = get_the_ID();
-    $summary = get_post_meta($post_id, '_ai_summary', true);
-
-    if ($summary) {
-        $interface_choice = get_option('chat_interface_choice', 'deepseek');
-        $title = '来自' . ($interface_choice === 'doubao' ? '豆包' : ($interface_choice === 'qwen' ? '通义千问' : 'DeepSeek')) . '的总结';
-
-        $summary_html = '
-            <div class="ai-summary-container">
-                <div class="ai-summary-title">' . esc_html($title) . '</div>
-                <div class="ai-summary-content">' . esc_html($summary) . '</div>
-            </div>
-        ';
-        $content = $summary_html . $content;
-    }
-
-    return $content;
-}
-add_filter('the_content', 'deepseek_display_ai_summary');
-
-// 动态加载总结CSS和JavaScript
-function deepseek_output_inline_styles() {
-    if (!get_option('enable_ai_summary') || !is_single()) {
-        return;
-    }
-
-    // 获取当前文章 ID
-    $post_id = get_the_ID();
-
-    // 检查文章是否有AI总结
-    if (!get_post_meta($post_id, '_ai_summary', true)) {
-        return;
-    }
-
-    // 输出CSS样式
-    $css = '
-        <style type="text/css">
-            .ai-summary-container {
-                background-color: #f0f4f8;
-                border: 1px solid #d1e0e8;
-                border-radius: 12px;
-                padding: 10px;
-                margin: 10px 0;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-                transition: box-shadow 0.3s ease, transform 0.3s ease;
-            }
-
-            .ai-summary-container:hover {
-                box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
-                transform: translateY(-2px);
-            }
-
-            .ai-summary-title {
-                text-align: center;
-                font-size: 15px;
-                font-weight: bold;
-                color: #2c3e50;
-                margin-bottom: 5px;
-            }
-
-            .ai-summary-content {
-                font-size: 16px;
-                line-height: 1.6;
-                color: #34495e;
-                text-align: center;
-                position: relative;
-                padding: 5px 0;
-            }
-        </style>
-    ';
-    echo $css;
-
-    // 打字效果JavaScript
-    echo '
-        <script type="text/javascript">
-            document.addEventListener("DOMContentLoaded", function() {
-                var aiSummaryContent = document.querySelector(".ai-summary-content");
-                if (aiSummaryContent) {
-                    var summaryText = aiSummaryContent.innerHTML;
-                    aiSummaryContent.innerHTML = "";
-
-                    var i = 0;
-                    var typingSpeed = 50; // 每个字符的显示速度（毫秒）
-
-                    function typeSummary() {
-                        if (i < summaryText.length) {
-                            aiSummaryContent.innerHTML += summaryText.charAt(i);
-                            i++;
-                            requestAnimationFrame(typeSummary, typingSpeed);
-                        }
-                    }
-
-                    // 页面加载完后再开始打字效果
-                    requestAnimationFrame(typeSummary, 300); // 延时300ms开始
-                }
-            });
-        </script>
-    ';
-}
-add_action('wp_head', 'deepseek_output_inline_styles');
-// 文章总结 结束
 
 
 // 对话 开始
@@ -772,9 +569,23 @@ function deepseek_chat_shortcode() {
     <!-- 主对话框 -->
     <div id="deepseek-chat-main">
         <!-- 消息框 -->
-        <div id="deepseek-chat-messages">
+        <div id="deepseek-chat-messages">         
             <!-- 初始为空，点击历史记录后动态加载 -->
             <div class="message-bubble bot" id="chatbot-prompt">你好，我可以帮你写作、写文案、翻译，有问题请问我~</div>
+            <!-- 自定义提示词面板 -->
+            <?php
+            $custom_prompts = get_option('deepseek_custom_prompts', '');
+            if (!empty($custom_prompts)) {
+                $prompts = array_filter(array_map('trim', explode("\n", $custom_prompts)));
+                if (!empty($prompts)) {
+                    echo '<div id="deepseek-custom-prompts">';
+                    foreach ($prompts as $prompt) {
+                        echo '<span class="deepseek-prompt">' . esc_html($prompt) . '</span>';
+                    }
+                    echo '</div>';
+                }
+            }
+            ?>            
         </div>
 
         <!-- 输入框和发送按钮 -->
@@ -825,6 +636,16 @@ function deepseek_chat_shortcode() {
         if (prompt) {
             prompt.style.display = 'none'; // 隐藏提示消息
         }
+    // 控制自定义提示词板块的显示状态
+    var customPrompts = document.getElementById('deepseek-custom-prompts');
+    if (customPrompts) {
+        // 当输入框非空时，隐藏提示词板块
+        if (this.value.trim().length > 0) {
+            customPrompts.style.display = 'none';
+        } else {
+            customPrompts.style.display = 'block';
+        }
+    }        
     });
 
     // 发送消息
@@ -915,7 +736,7 @@ function deepseek_chat_shortcode() {
                         }
                     }
                 } else {
-                    // 流式文本回复处理（文本对话分支）
+                    // 流式文本回复处理
                     var messagesContainer = document.getElementById('deepseek-chat-messages');
                     
                     // 移除“小助手正在思考中...”的提示
@@ -927,13 +748,13 @@ function deepseek_chat_shortcode() {
                     // 添加用户消息
                     messagesContainer.innerHTML += '<div class="message-bubble user">' + message + '</div>';
                     
-                    // 添加一个消息框 div，用于显示AI回复
+                    // 添加一个消息框div，用于显示AI回复
                     var botMessageContainer = document.createElement('div');
                     botMessageContainer.classList.add('message-bubble', 'bot');
                     botMessageContainer.textContent = '';  // 初始为空，逐步填充
                     messagesContainer.appendChild(botMessageContainer);
 
-                    // 使用ReadableStream API 对SSE格式的数据做处理
+                    // 使用ReadableStream API对SSE格式的数据做处理
                     const reader = result.response.body.getReader();
                     const decoder = new TextDecoder();
                     let botReply = '';
@@ -994,7 +815,7 @@ function deepseek_chat_shortcode() {
                                 }
                             }
                         } catch(e) {
-                            console.error("Error parsing SSE JSON", e);
+                            console.error("解析SSE数据错误", e);
                         }
                     }
                     
@@ -1265,6 +1086,25 @@ function deepseek_chat_shortcode() {
         }
     });
 </script>
+<!-- 自定义提示词点击事件，点击后自动将提示词加上分号插入输入框 -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var prompts = document.querySelectorAll('.deepseek-prompt');
+    prompts.forEach(function(prompt) {
+        prompt.addEventListener('click', function() {
+            var inputBox = document.getElementById('deepseek-chat-input');
+            if (inputBox) {
+                var promptText = this.textContent.trim();
+                // 如果输入框内容不以该提示词开头，则预置提示词和冒号
+                if (!inputBox.value.startsWith(promptText + ':')) {
+                    inputBox.value = promptText + ': ' + inputBox.value;
+                }
+                inputBox.focus();
+            }
+        });
+    });
+});
+</script>
         <?php
     }
     return ob_get_clean();
@@ -1272,7 +1112,7 @@ function deepseek_chat_shortcode() {
 add_shortcode('deepseek_chat', 'deepseek_chat_shortcode');
 
 
-// 使用REST API 方式处理消息
+// 使用REST API方式处理消息
 function deepseek_send_message_rest( WP_REST_Request $request ) {
     global $wpdb;
     $table_name = $wpdb->prefix . 'deepseek_chat_logs';
@@ -1286,7 +1126,7 @@ function deepseek_send_message_rest( WP_REST_Request $request ) {
     $is_image_model = in_array(get_option('qwen_model'), ['wanx2.1-t2i-turbo', 'wanx2.1-t2i-plus']);
 
     if ($interface_choice === 'qwen' && $is_image_model) {
-        // 图片生成分支（保持原有逻辑）
+        // 图片生成分支
         $api_key = get_option('qwen_api_key');
         $model = get_option('qwen_model');
         $api_url = 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis';
@@ -1466,8 +1306,6 @@ function deepseek_send_message_rest( WP_REST_Request $request ) {
         exit();
     }
 }
-//add_action('wp_ajax_deepseek_send_message', 'deepseek_send_message_rest');
-//add_action('wp_ajax_nopriv_deepseek_send_message', 'deepseek_send_message_rest');
 
 add_action('rest_api_init', function () {
     register_rest_route('deepseek/v1', '/send-message', array(
@@ -1689,9 +1527,223 @@ function deepseek_render_logs_page() {
 }
 // 对话 结束
 
+// 文章总结 开始
+// 文章发布时标记为需要生成文章总结
+function deepseek_mark_post_for_summary($post_id, $post, $update) {
+    if (!get_option('enable_ai_summary') || $post->post_status !== 'publish' || wp_is_post_revision($post_id)) {
+        return;
+    }
+
+    update_post_meta($post_id, '_needs_ai_summary', 1);
+}
+add_action('wp_after_insert_post', 'deepseek_mark_post_for_summary', 10, 3);
+
+// 文章第一次访问时生成总结
+function deepseek_generate_summary_on_first_visit() {
+    if (!get_option('enable_ai_summary') || !is_single()) {
+        return;
+    }
+
+    $post_id = get_the_ID();
+    if (!get_post_meta($post_id, '_needs_ai_summary', true)) {
+        return;
+    }
+
+    $post = get_post($post_id);
+    $content = $post->post_content;
+
+    // 调用AI接口生成总结
+    $summary = deepseek_call_ai_api($content);
+
+    if ($summary) {
+        update_post_meta($post_id, '_ai_summary', $summary);
+        delete_post_meta($post_id, '_needs_ai_summary');
+    }
+}
+add_action('template_redirect', 'deepseek_generate_summary_on_first_visit');
+
+// 调用AI接口生成文章总结
+function deepseek_call_ai_api($content) {
+    $api_key = '';
+    $model = '';
+    $url = '';
+
+    // 根据选择的接口设置API Key、模型和URL
+    $interface_choice = get_option('chat_interface_choice');
+    switch ($interface_choice) {
+        case 'deepseek':
+            $api_key = get_option('deepseek_api_key');
+            $model = get_option('deepseek_model');
+            $url = 'https://api.deepseek.com/chat/completions';
+            break;
+        case 'doubao':
+            $api_key = get_option('doubao_api_key');
+            $model = get_option('doubao_model');
+            $url = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
+            break;
+        case 'qwen':
+            $api_key = get_option('qwen_api_key');
+            $model = get_option('qwen_model');
+            $url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+            break;
+    }
+
+    // 构建请求数据
+    $data = array(
+        'model' => $model,
+        'messages' => array(
+            array(
+                'role' => 'system',
+                'content' => 'You are a helpful assistant.'
+            ),
+            array(
+                'role' => 'user',
+                'content' => '请为以下文章生成一句话总结，总结不要超过50个字，不要添加任何前缀或标题：' . $content
+            )
+        )
+    );
+
+    // 发送请求
+    $response = wp_remote_post($url, array(
+        'headers' => array(
+            'Content-Type' => 'application/json',
+            'Authorization' => 'Bearer ' . $api_key
+        ),
+        'body' => json_encode($data)
+    ));
+
+    // 记录错误日志
+    if (is_wp_error($response)) {
+        error_log('AI 接口请求失败：' . $response->get_error_message());
+        return false;
+    }
+
+    $body = wp_remote_retrieve_body($response);
+    $result = json_decode($body, true);
+
+    if (isset($result['choices'][0]['message']['content'])) {
+        // 移除可能的前缀
+        $summary = trim($result['choices'][0]['message']['content']);
+        $summary = preg_replace('/^(摘要|总结|文章摘要|摘要：|文章摘要：)\s*/', '', $summary);
+        return $summary;
+    }
+
+    // 记录API返回错误日志
+    error_log('AI 接口返回结果异常：' . print_r($result, true));
+    return false;
+}
+
+// 在前台文章页面插入总结
+function deepseek_display_ai_summary($content) {
+    if (!get_option('enable_ai_summary') || !is_single()) {
+        return $content;
+    }
+
+    $post_id = get_the_ID();
+    $summary = get_post_meta($post_id, '_ai_summary', true);
+
+    if ($summary) {
+        $interface_choice = get_option('chat_interface_choice', 'deepseek');
+        $title = '来自' . ($interface_choice === 'doubao' ? '豆包' : ($interface_choice === 'qwen' ? '通义千问' : 'DeepSeek')) . '的总结';
+
+        $summary_html = '
+            <div class="ai-summary-container">
+                <div class="ai-summary-title">' . esc_html($title) . '</div>
+                <div class="ai-summary-content">' . esc_html($summary) . '</div>
+            </div>
+        ';
+        $content = $summary_html . $content;
+    }
+
+    return $content;
+}
+add_filter('the_content', 'deepseek_display_ai_summary');
+
+// 动态加载总结CSS和JavaScript
+function deepseek_output_inline_styles() {
+    if (!get_option('enable_ai_summary') || !is_single()) {
+        return;
+    }
+
+    // 获取当前文章 ID
+    $post_id = get_the_ID();
+
+    // 检查文章是否有AI总结
+    if (!get_post_meta($post_id, '_ai_summary', true)) {
+        return;
+    }
+
+    // 输出CSS样式
+    $css = '
+        <style type="text/css">
+            .ai-summary-container {
+                background-color: #f0f4f8;
+                border: 1px solid #d1e0e8;
+                border-radius: 12px;
+                padding: 10px;
+                margin: 10px 0;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                transition: box-shadow 0.3s ease, transform 0.3s ease;
+            }
+
+            .ai-summary-container:hover {
+                box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+                transform: translateY(-2px);
+            }
+
+            .ai-summary-title {
+                text-align: center;
+                font-size: 15px;
+                font-weight: bold;
+                color: #2c3e50;
+                margin-bottom: 5px;
+            }
+
+            .ai-summary-content {
+                font-size: 16px;
+                line-height: 1.6;
+                color: #34495e;
+                text-align: center;
+                position: relative;
+                padding: 5px 0;
+            }
+        </style>
+    ';
+    echo $css;
+
+    // 打字效果JavaScript
+    echo '
+        <script type="text/javascript">
+            document.addEventListener("DOMContentLoaded", function() {
+                var aiSummaryContent = document.querySelector(".ai-summary-content");
+                if (aiSummaryContent) {
+                    var summaryText = aiSummaryContent.innerHTML;
+                    aiSummaryContent.innerHTML = "";
+
+                    var i = 0;
+                    var typingSpeed = 50; // 每个字符的显示速度（毫秒）
+
+                    function typeSummary() {
+                        if (i < summaryText.length) {
+                            aiSummaryContent.innerHTML += summaryText.charAt(i);
+                            i++;
+                            requestAnimationFrame(typeSummary, typingSpeed);
+                        }
+                    }
+
+                    // 页面加载完后再开始打字效果
+                    requestAnimationFrame(typeSummary, 300); // 延时300ms开始
+                }
+            });
+        </script>
+    ';
+}
+add_action('wp_head', 'deepseek_output_inline_styles');
+// 文章总结 结束
+
 
 // 文章生成 开始
-// 文章生成页面
+// 文章生成页面（流式输出）
 function deepseek_render_article_generator_page() {
     ?>
     <div class="wrap">
@@ -1744,44 +1796,64 @@ function deepseek_render_article_generator_page() {
     </div>
 
     <script>
-    // 监听生成文章按钮点击事件
+    // 监听生成文章按钮点击事件，使用 SSE 流式获取文章内容
     document.getElementById('generate-button').addEventListener('click', function() {
         // 显示“正在生成中”提示
         document.getElementById('generation-status').style.display = 'block';
-        document.getElementById('timeout-status').style.display = 'none'; // 隐藏超时提示
+        document.getElementById('timeout-status').style.display = 'none';
 
         var keyword = document.querySelector('input[name="keyword"]').value;
-        var category_id = document.querySelector('select[name="category_id"]').value;
         var interface_choice = document.querySelector('select[name="interface_choice"]').value;
 
-        var data = {
-            action: 'generate_article_ajax',
-            keyword: keyword,
-            category_id: category_id,
-            interface_choice: interface_choice
-        };
+        // 构造SSE请求URL
+        var sseUrl = ajaxurl + '?action=generate_article_stream_ajax'
+            + '&keyword=' + encodeURIComponent(keyword)
+            + '&interface_choice=' + encodeURIComponent(interface_choice);
 
-        // 使用 AJAX 请求生成文章
-        jQuery.post(ajaxurl, data, function(response) {
-            document.getElementById('generation-status').style.display = 'none';
-            if (response.success) {
-                // 如果成功，填充标题和内容到文章编辑器
-                document.getElementById("post_title").value = response.data.title;
-                tinymce.get('post_content').setContent(response.data.content);
-            } else {
-                // 如果失败，显示超时提示
+        if (typeof(EventSource) !== "undefined") {
+            var eventSource = new EventSource(sseUrl);
+            var articleContent = "";
+            eventSource.onmessage = function(event) {
+                try {
+                    var data = JSON.parse(event.data);
+                    if (data.content) {
+                        articleContent += data.content;
+                        // 将实时返回的内容更新到编辑器中
+                        var contentWithBr = articleContent.replace(/\n/g, '<br>');
+                        if (tinymce.get('post_content')) {
+                            tinymce.get('post_content').setContent(contentWithBr);
+                        } else {
+                            document.getElementById('post_content').value = contentWithBr;
+                        }
+                    }
+                } catch (e) {
+                    console.error("解析SSE数据错误", e);
+                }
+            };
+            eventSource.addEventListener('done', function(event) {
+                // 流结束后，从返回内容中提取标题
+                var lines = articleContent.split("\n");
+                if (lines.length > 0) {
+                    document.getElementById('post_title').value = lines[0];
+                }
+                document.getElementById('generation-status').style.display = 'none';
+                eventSource.close();
+            });
+            eventSource.onerror = function(event) {
+                console.error("SSE 连接错误", event);
                 document.getElementById('timeout-status').style.display = 'block';
-            }
-        }).fail(function() {
-            // AJAX 请求失败时显示超时提示
+                document.getElementById('generation-status').style.display = 'none';
+                eventSource.close();
+            };
+        } else {
             document.getElementById('generation-status').style.display = 'none';
-            document.getElementById('timeout-status').style.display = 'block';
-        });
+            alert("您的浏览器不支持服务器发送事件 (SSE)，请使用支持 SSE 的浏览器。");
+        }
     });
 
-    // 监听发布文章按钮点击事件
+    // 发布文章按钮
     document.getElementById('publish-button').addEventListener('click', function(e) {
-        e.preventDefault();  // 防止表单提交
+        e.preventDefault();  // 防止表单默认提交
 
         var post_title = document.getElementById('post_title').value;
         var post_content = tinymce.get('post_content').getContent();
@@ -1794,53 +1866,61 @@ function deepseek_render_article_generator_page() {
             category_id: category_id
         };
 
-        // 使用 AJAX 请求发布文章
         jQuery.post(ajaxurl, data, function(response) {
             var resultDiv = document.getElementById('publish-result');
             if (response.success) {
                 resultDiv.style.display = 'block';
-                resultDiv.innerHTML = '<span style="color: green;">' + response.data.message + '</span>'; // 发布成功
+                resultDiv.innerHTML = '<span style="color: green;">' + response.data.message + '</span>';
             } else {
                 resultDiv.style.display = 'block';
-                resultDiv.innerHTML = '<span style="color: red;">' + response.data.message + '</span>'; // 发布失败
+                resultDiv.innerHTML = '<span style="color: red;">' + response.data.message + '</span>';
             }
         }).fail(function() {
             var resultDiv = document.getElementById('publish-result');
             resultDiv.style.display = 'block';
-            resultDiv.innerHTML = '<span style="color: red;">发布文章失败，请重试。</span>'; // 请求失败
+            resultDiv.innerHTML = '<span style="color: red;">发布文章失败，请重试。</span>';
         });
     });
     </script>
-
     <?php
 }
 
-// 生成文章的 AJAX 处理函数
-function deepseek_generate_article_ajax() {
-    // 获取请求参数
-    $keyword = sanitize_text_field($_POST['keyword']);
-    $category_id = intval($_POST['category_id']);
-    $interface_choice = sanitize_text_field($_POST['interface_choice']);
+// SSE流式文章生成处理函数
+function deepseek_generate_article_stream_ajax() {
+    // 关闭用户中断和执行时间限制
+    ignore_user_abort(true);
+    set_time_limit(0);
 
-    // 调用生成文章的函数
-    $article_data = generate_article($keyword, $interface_choice);
-
-    if ($article_data) {
-        wp_send_json_success($article_data); // 成功返回数据
-    } else {
-        wp_send_json_error(); // 失败时返回错误
+    // 清理所有输出缓冲，避免多余输出
+    if (ob_get_length()) {
+        ob_end_clean();
     }
 
-    wp_die();
-}
-add_action('wp_ajax_generate_article_ajax', 'deepseek_generate_article_ajax');
-add_action('wp_ajax_nopriv_generate_article_ajax', 'deepseek_generate_article_ajax');
+    // 设置SSE必要头信息
+    header('Content-Type: text/event-stream');
+    header('Cache-Control: no-cache');
+    header('X-Accel-Buffering: no'); // 针对Nginx的设置
+    header('Content-Encoding: none');
 
-// 生成文章内容的函数
-function generate_article($keyword, $interface_choice) {
+    // 关闭所有输出缓冲层并开启隐式刷新
+    while (ob_get_level()) {
+        ob_end_flush();
+    }
+    ob_implicit_flush(true);
+
+    // 从GET参数中获取参数
+    $keyword = isset($_GET['keyword']) ? sanitize_text_field($_GET['keyword']) : '';
+    $interface_choice = isset($_GET['interface_choice']) ? sanitize_text_field($_GET['interface_choice']) : '';
+
+    if (empty($keyword) || empty($interface_choice)) {
+        echo "data: " . json_encode(['error' => '缺少必要参数']) . "\n\n";
+        flush();
+        exit;
+    }
+
     $api_key = get_option($interface_choice . '_api_key');
-    $model = get_option($interface_choice . '_model');
-    // 根据接口选择设置请求的 URL
+    $model   = get_option($interface_choice . '_model');
+
     if ($interface_choice === 'deepseek') {
         $url = 'https://api.deepseek.com/chat/completions';
     } elseif ($interface_choice === 'doubao') {
@@ -1848,59 +1928,75 @@ function generate_article($keyword, $interface_choice) {
     } elseif ($interface_choice === 'qwen') {
         $url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
     } else {
-        return null; // 不支持的接口
+        echo "data: " . json_encode(['error' => '不支持的接口']) . "\n\n";
+        flush();
+        exit;
     }
 
-    $body = json_encode(array(
-        'model' => $model,
+    // 构造请求体，开启流式输出
+    $payload = json_encode(array(
+        'model'    => $model,
         'messages' => array(
             array('role' => 'system', 'content' => 'You are a helpful assistant.'),
-            array('role' => 'user', 'content' => '根据关键词 "' . $keyword . '" 生成文章和标题')
+            array('role' => 'user', 'content' => '根据关键词 "' . $keyword . '" 生成文章和标题，文章行首不要带*号或者多个#号')
         ),
-        'stream' => ($interface_choice === 'deepseek') ? false : null
+        'stream'   => true,
     ));
 
-    $args = array(
-        'body' => $body,
-        'headers' => array(
-            'Authorization' => 'Bearer ' . $api_key,
-            'Content-Type'  => 'application/json',
-        ),
-        'timeout' => 120, // 超时时间设置为2分钟
+    $headers = array(
+        'Authorization: Bearer ' . $api_key,
+        'Content-Type: application/json',
     );
 
-    $response = wp_remote_post($url, $args);
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 120);
 
-    if (is_wp_error($response)) {
-        return null;
+    // 通过回调逐块处理返回数据
+    curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($ch, $chunk) {
+        $lines = explode("\n", $chunk);
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line)) continue;
+
+            // 检查结束标记
+            if (strpos($line, 'data: [DONE]') !== false) {
+                echo "event: done\n";
+                echo "data: " . json_encode(['message' => '流结束']) . "\n\n";
+                flush();
+                continue;
+            }
+            if (strpos($line, 'data:') === 0) {
+                $jsonStr = trim(substr($line, 5));
+                if (!empty($jsonStr)) {
+                    $data = json_decode($jsonStr, true);
+                    if (isset($data['choices'][0]['delta']['content'])) {
+                        $content = $data['choices'][0]['delta']['content'];
+                        echo "data: " . json_encode(['content' => $content]) . "\n\n";
+                        flush();
+                    }
+                }
+            }
+        }
+        return strlen($chunk);
+    });
+
+    curl_exec($ch);
+    if (curl_errno($ch)) {
+        echo "data: " . json_encode(['error' => curl_error($ch)]) . "\n\n";
+        flush();
     }
-
-    $body = wp_remote_retrieve_body($response);
-    $status_code = wp_remote_retrieve_response_code($response);
-
-    if ($status_code !== 200) {
-        return null;
-    }
-
-    $data = json_decode($body, true);
-    if (!isset($data['choices'][0]['message']['content'])) {
-        return null;
-    }
-
-    $article_content = $data['choices'][0]['message']['content'];
-    $article_title = substr($article_content, 0, strpos($article_content, "\n"));
-
-    // 处理换行符并转换为合适的格式
-    $article_content = nl2br($article_content); // 保留换行符
-
-    // 将文章内容返回给前端
-    return array(
-        'title'   => $article_title,
-        'content' => $article_content,
-    );
+    curl_close($ch);
+    exit;
 }
+add_action('wp_ajax_generate_article_stream_ajax', 'deepseek_generate_article_stream_ajax');
+add_action('wp_ajax_nopriv_generate_article_stream_ajax', 'deepseek_generate_article_stream_ajax');
 
-// 发布文章的 AJAX 处理函数
+
+// 发布文章的AJAX处理函数
 function deepseek_publish_article_ajax() {
     // 获取请求参数
     $post_title = sanitize_text_field($_POST['post_title']);
@@ -1952,7 +2048,7 @@ function deepseek_tts() {
     $interface = isset($options['tts_interface']) ? $options['tts_interface'] : 'tencent';
 
     $audio_urls = array();
-    // 按分段调用 wpatai_generate_tts_audio 进行语音合成
+    // 按分段调用wpatai_generate_tts_audio进行语音合成
     foreach ($segments as $segment) {
         $audio_url = wpatai_generate_tts_audio( $segment, $interface );
         if ( is_wp_error($audio_url) ) {
@@ -1964,5 +2060,28 @@ function deepseek_tts() {
 }
 add_action('wp_ajax_deepseek_tts', 'deepseek_tts');
 add_action('wp_ajax_nopriv_deepseek_tts', 'deepseek_tts');
+
+// 插件卸载时删除相关设置项
+function deepseek_delete_plugin_settings() {
+    $settings = [
+        'deepseek_api_key',
+        'deepseek_model',
+        'doubao_api_key',
+        'doubao_model',
+        'qwen_api_key',
+        'qwen_model',
+        'chat_interface_choice',
+        'show_ai_helper',
+        'enable_ai_summary',
+        'enable_ai_voice_reading',
+        'deepseek_custom_prompts',
+    ];
+
+    foreach ($settings as $setting) {
+        delete_option($setting);
+    }
+}
+
+register_uninstall_hook(__FILE__, 'deepseek_delete_plugin_settings');
 
 ?>

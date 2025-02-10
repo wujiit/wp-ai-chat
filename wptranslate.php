@@ -869,4 +869,10 @@ function wpatai_tts_generate_action( $text, $interface, $callback ) {
 }
 add_action( 'wpatai_tts_generate', 'wpatai_tts_generate_action', 10, 3 );
 
+// 卸载插件的时候删掉设置项
+function wpatai_delete_plugin_settings() {
+    delete_option('wpatai_settings');
+}
+register_uninstall_hook(__FILE__, 'wpatai_delete_plugin_settings');
+
 ?>
