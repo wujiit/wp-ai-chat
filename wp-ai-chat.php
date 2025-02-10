@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结，可对接deepseek、通义千问、豆包模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 2.0
+Version: 2.2
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -77,7 +77,7 @@ function deepseek_register_settings() {
     register_setting('deepseek_chat_options_group', 'show_ai_helper'); // ai助手显示
     register_setting('deepseek_chat_options_group', 'enable_ai_summary'); // 文章总结
 
-    register_setting('deepseek_chat_options_group', 'enable_ai_voice_reading'); //AI对话语音朗读
+    register_setting('deepseek_chat_options_group', 'enable_ai_voice_reading'); // AI对话语音朗读
 
     add_settings_section('deepseek_main_section', '基础设置', null, 'deepseek-chat');
 
@@ -107,13 +107,13 @@ function deepseek_register_settings() {
 }
 add_action('admin_init', 'deepseek_register_settings');
 
-// AI对话语音朗读回调
+// AI对话语音朗读函数回调
 function enable_ai_voice_reading_callback() {
     $checked = get_option('enable_ai_voice_reading', '0');
     echo '<input type="checkbox" name="enable_ai_voice_reading" value="1" ' . checked(1, $checked, false) . ' />';
 }
 
-// 助手入口处理回调
+// 助手入口处理函数回调
 function show_ai_helper_callback() {
     $checked = get_option('show_ai_helper', '0');
     echo '<input type="checkbox" name="show_ai_helper" value="1" ' . checked(1, $checked, false) . ' />';
@@ -222,9 +222,8 @@ function qwen_model_callback() {
         <option value="qwen-plus" <?php selected($model, 'qwen-plus'); ?>>qwen-plus</option>
         <option value="qwen-turbo" <?php selected($model, 'qwen-turbo'); ?>>qwen-turbo</option>
         <option value="qwen-long" <?php selected($model, 'qwen-long'); ?>>qwen-long</option>
-        <option value="qwen-mt-plus" <?php selected($model, 'qwen-mt-plus'); ?>>qwen-mt-plus</option>
-        <option value="qwen-mt-turbo" <?php selected($model, 'qwen-mt-turbo'); ?>>qwen-mt-turbo</option>
         <option value="qwen2.5-14b-instruct-1m" <?php selected($model, 'qwen2.5-14b-instruct-1m'); ?>>qwen2.5-14b-instruct-1m</option>
+        <option value="qwen2.5-7b-instruct-1m" <?php selected($model, 'qwen2.5-7b-instruct-1m'); ?>>qwen2.5-7b-instruct-1m</option>
         <option value="qwen2.5-1.5b-instruct" <?php selected($model, 'qwen2.5-1.5b-instruct'); ?>>qwen2.5-1.5b-instruct</option>
         <option value="wanx2.1-t2i-turbo" <?php selected($model, 'wanx2.1-t2i-turbo'); ?>>wanx2.1-t2i-turbo图片生成</option>
         <option value="wanx2.1-t2i-plus" <?php selected($model, 'wanx2.1-t2i-plus'); ?>>wanx2.1-t2i-plus图片生成</option>
@@ -319,14 +318,14 @@ function deepseek_add_menu() {
         'deepseek-article-generator',
         'deepseek_render_article_generator_page' // 文章生成页面回调函数
     );
-    // 子菜单项 - 文章 AI 翻译
+    // 子菜单项 - 翻译朗读
     add_submenu_page(
-        'deepseek', // 父菜单slug
-        '翻译朗读', // 页面标题
-        '翻译朗读', // 菜单标题
+        'deepseek',
+        '翻译朗读',
+        '翻译朗读',
         'manage_options',
-        'deepseek-translate', // 菜单slug
-        'wpatai_settings_page' // 指向翻译插件的设置页面回调函数
+        'deepseek-translate',
+        'wpatai_settings_page' // 翻译页面回调函数
     );
     
 }
@@ -746,7 +745,6 @@ function deepseek_chat_shortcode() {
             "SELECT * FROM $table_name WHERE user_id = %d GROUP BY conversation_id ORDER BY created_at DESC",
             $user_id
         ));
-
         ?>
 <div id="deepseek-chat-container">
     <!-- 历史对话框 -->
@@ -794,88 +792,130 @@ function deepseek_chat_shortcode() {
     }
     var aiVoiceEnabled = <?php echo get_option('enable_ai_voice_reading', '0'); ?>;
 </script>
+<!-- REST API nonce，用于权限验证 -->
 <script>
-    var currentConversationId = null; // 当前对话的id
-    
-// 默认提示    
-document.getElementById('deepseek-chat-input').addEventListener('input', function() {
-    var prompt = document.getElementById('chatbot-prompt');
-    if (prompt) {
-        prompt.style.display = 'none'; // 隐藏提示消息
-    }
-});
+    var deepseek_rest_nonce = '<?php echo wp_create_nonce('wp_rest'); ?>';
+</script>
+<script>
+    // 全局当前对话ID变量
+    var currentConversationId = null; 
 
-// 发送消息
-document.getElementById('deepseek-chat-send').addEventListener('click', function() {
-    var message = document.getElementById('deepseek-chat-input').value;
-    if (message) {
-        // 显示“小助手正在思考中...”的提示
-        var thinkingMessage = document.createElement('div');
-        thinkingMessage.id = 'deepseek-thinking-message';
-        thinkingMessage.className = 'message-bubble bot';
-        thinkingMessage.innerHTML = '小助手正在思考中...';
-        document.getElementById('deepseek-chat-messages').appendChild(thinkingMessage);
-
-        var data = new URLSearchParams();
-        data.append('action', 'deepseek_send_message');
-        data.append('message', message);
-        if (currentConversationId) {
-            data.append('conversation_id', currentConversationId);
+    // 封装一个设置对话ID的函数，同时更新localStorage
+    function setCurrentConversationId(id) {
+        currentConversationId = id;
+        if (id) {
+            localStorage.setItem('currentConversationId', id);
+        } else {
+            localStorage.removeItem('currentConversationId');
         }
+    }
 
-        // 发送消息并显示回复
-        fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: data
-        }).then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                if (data.is_image) {
-                    // 图片生成处理
-                    handleImageGeneration(data.task_id);
+    // 页面加载时，检测localStorage中是否有对话ID
+    window.addEventListener('load', function() {
+        var storedId = localStorage.getItem('currentConversationId');
+        if (storedId) {
+            setCurrentConversationId(storedId);
+            loadChatLog(storedId);
+        }
+    });
+    
+    // 默认提示    
+    document.getElementById('deepseek-chat-input').addEventListener('input', function() {
+        var prompt = document.getElementById('chatbot-prompt');
+        if (prompt) {
+            prompt.style.display = 'none'; // 隐藏提示消息
+        }
+    });
 
-                    // 动态更新历史对话框
-                    if (!currentConversationId) {
-                        var historyContainer = document.querySelector('#deepseek-chat-history ul');
-                        var newChatItem = document.createElement('li');
-                        newChatItem.setAttribute('data-conversation-id', data.conversation_id);
-                        newChatItem.innerHTML = '<span class="deepseek-chat-title">' + data.conversation_title + '</span>' +
-                            '<button class="deepseek-delete-log" data-conversation-id="' + data.conversation_id + '">删除</button>';
-                        historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
+    // 发送消息
+    document.getElementById('deepseek-chat-send').addEventListener('click', function() {
+        var message = document.getElementById('deepseek-chat-input').value;
+        if (message) {
+            // 判断是否为新对话，保存当前消息作为对话标题
+            var newConversation = false;
+            var currentMessage = message; // 新对话时，用第一句作为标题
+            if (!currentConversationId) {
+                newConversation = true;
+            }
+            
+            // 显示“小助手正在思考中...”的提示
+            var thinkingMessage = document.createElement('div');
+            thinkingMessage.id = 'deepseek-thinking-message';
+            thinkingMessage.className = 'message-bubble bot';
+            thinkingMessage.innerHTML = '小助手正在思考中...';
+            document.getElementById('deepseek-chat-messages').appendChild(thinkingMessage);
 
-                        // 绑定新历史记录的点击事件
-                        newChatItem.addEventListener('click', function() {
-                            loadChatLog(data.conversation_id);
-                        });
+            // 使用REST API接口，传输JSON数据，并附加nonce进行权限验证
+            fetch('<?php echo esc_url( rest_url('deepseek/v1/send-message') ); ?>', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-WP-Nonce': deepseek_rest_nonce
+                },
+                body: JSON.stringify({
+                    message: message,
+                    conversation_id: currentConversationId
+                })
+            })
+            .then(response => {
+                const contentType = response.headers.get('Content-Type') || '';
+                // 如果返回JSON，则按非流式逻辑处理(图片生成)
+                if (contentType.indexOf('application/json') !== -1) {
+                    return response.json().then(data => ({ data, isJson: true }));
+                } else {
+                    // 否则走流式文本返回
+                    return { response };
+                }
+            })
+            .then(result => {
+                if (result.isJson) {
+                    var data = result.data;
+                    if (data.success) {
+                        if (data.is_image) {
+                            // 图片生成处理
+                            handleImageGeneration(data.task_id);
 
-                        // 绑定新历史记录的删除按钮事件
-                        newChatItem.querySelector('.deepseek-delete-log').addEventListener('click', function() {
-                            var conversationId = this.getAttribute('data-conversation-id');
-                            fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/x-www-form-urlencoded',
-                                },
-                                body: 'action=deepseek_delete_log&conversation_id=' + conversationId
-                            }).then(response => response.json())
-                            .then(data => {
-                                if (data.success) {
-                                    this.parentElement.remove();
-                                    // 清空消息框内容
-                                    document.getElementById('deepseek-chat-messages').innerHTML = '';
-                                    // 重置当前对话的conversation_id
-                                    currentConversationId = null;
-                                }
-                            });
-                        });
+                            // 如果当前对话为空，则更新历史记录（仅新对话需要更新对话id）
+                            if (!currentConversationId) {
+                                var historyContainer = document.querySelector('#deepseek-chat-history ul');
+                                var newChatItem = document.createElement('li');
+                                newChatItem.setAttribute('data-conversation-id', data.conversation_id);
+                                newChatItem.innerHTML = '<span class="deepseek-chat-title">' + data.conversation_title + '</span>' +
+                                    '<button class="deepseek-delete-log" data-conversation-id="' + data.conversation_id + '">删除</button>';
+                                historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
 
-                        currentConversationId = data.conversation_id;
+                                // 绑定新历史记录的点击事件
+                                newChatItem.addEventListener('click', function() {
+                                    loadChatLog(data.conversation_id);
+                                });
+
+                                // 绑定新历史记录的删除按钮事件
+                                newChatItem.querySelector('.deepseek-delete-log').addEventListener('click', function() {
+                                    var conversationId = this.getAttribute('data-conversation-id');
+                                    fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/x-www-form-urlencoded',
+                                        },
+                                        body: 'action=deepseek_delete_log&conversation_id=' + conversationId
+                                    }).then(response => response.json())
+                                    .then(data => {
+                                        if (data.success) {
+                                            this.parentElement.remove();
+                                            // 清空消息框内容
+                                            document.getElementById('deepseek-chat-messages').innerHTML = '';
+                                            // 重置当前对话id
+                                            currentConversationId = null;
+                                        }
+                                    });
+                                });
+
+                                setCurrentConversationId(data.conversation_id);
+                            }
+                        }
                     }
                 } else {
-                    // 文本对话处理
+                    // 流式文本回复处理（文本对话分支）
                     var messagesContainer = document.getElementById('deepseek-chat-messages');
                     
                     // 移除“小助手正在思考中...”的提示
@@ -890,250 +930,293 @@ document.getElementById('deepseek-chat-send').addEventListener('click', function
                     // 添加一个消息框 div，用于显示AI回复
                     var botMessageContainer = document.createElement('div');
                     botMessageContainer.classList.add('message-bubble', 'bot');
-                    botMessageContainer.innerHTML = '';  // 初始为空，逐字填充
+                    botMessageContainer.textContent = '';  // 初始为空，逐步填充
                     messagesContainer.appendChild(botMessageContainer);
 
-                    // textContent追加原始字符，避免HTML转义
-                    var botReply = data.message; // 确保返回的是纯 Markdown 格式文本
-                    var index = 0;
-                    var typingSpeed = 100; // 控制打字速度
-
-                    function typeWriter() {
-                        if (index < botReply.length) {
-                        // 使用 textContent 累加字符，防止浏览器提前解析HTML标签
-                            botMessageContainer.textContent += botReply.charAt(index);
-                            index++;
-                            requestAnimationFrame(typeWriter, typingSpeed);
-                        } else {
-                        // 打字结束后，将容器内的 Markdown 文本转换为 HTML 并更新显示
-                            botMessageContainer.innerHTML = convertMarkdownToHTML(botReply);
-                        // 如果启用了语音朗读
+                    // 使用ReadableStream API 对SSE格式的数据做处理
+                    const reader = result.response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let botReply = '';
+                    let buffer = '';
+                    
+                    // 修改后的processLine函数：在解析到conversation_id时，如果是新对话则更新历史记录
+                    function processLine(line) {
+                        line = line.trim();
+                        if (!line.startsWith("data:")) return;
+                        let dataPart = line.substring(5).trim();
+                        if (dataPart === "[DONE]") return;
+                        try {
+                            let jsonData = JSON.parse(dataPart);
+                            if (jsonData.conversation_id) {
+                                // 如果是新对话，则在历史对话列表中插入对话标题（即用户第一条消息）
+                                if (newConversation) {
+                                    setCurrentConversationId(jsonData.conversation_id);
+                                    var historyContainer = document.querySelector('#deepseek-chat-history ul');
+                                    var newChatItem = document.createElement('li');
+                                    newChatItem.setAttribute('data-conversation-id', jsonData.conversation_id);
+                                    newChatItem.innerHTML = '<span class="deepseek-chat-title">' + currentMessage + '</span>' +
+                                        '<button class="deepseek-delete-log" data-conversation-id="' + jsonData.conversation_id + '">删除</button>';
+                                    historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
+                                    // 绑定点击加载对话
+                                    newChatItem.addEventListener('click', function() {
+                                        loadChatLog(jsonData.conversation_id);
+                                    });
+                                    // 绑定删除按钮事件
+                                    newChatItem.querySelector('.deepseek-delete-log').addEventListener('click', function(e) {
+                                        e.stopPropagation();
+                                        var conversationId = this.getAttribute('data-conversation-id');
+                                        fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/x-www-form-urlencoded',
+                                            },
+                                            body: 'action=deepseek_delete_log&conversation_id=' + conversationId
+                                        }).then(response => response.json())
+                                        .then(data => {
+                                            if (data.success) {
+                                                this.parentElement.remove();
+                                                document.getElementById('deepseek-chat-messages').innerHTML = '';
+                                                setCurrentConversationId(null);
+                                            }
+                                        });
+                                    });
+                                    newConversation = false; // 标记已更新历史记录
+                                } else {
+                                    setCurrentConversationId(jsonData.conversation_id);
+                                }
+                                return;
+                            }
+                            if (jsonData && jsonData.choices && jsonData.choices.length > 0) {
+                                let delta = jsonData.choices[0].delta;
+                                if (delta && delta.content) {
+                                    botReply += delta.content;
+                                    botMessageContainer.textContent = botReply;
+                                }
+                            }
+                        } catch(e) {
+                            console.error("Error parsing SSE JSON", e);
+                        }
+                    }
+                    
+                    function readStream() {
+                        reader.read().then(({done, value}) => {
+                            if (done) {
+                                // 处理最后剩余的不完整数据
+                                if (buffer.length > 0) {
+                                    let lines = buffer.split("\n");
+                                    lines.forEach(processLine);
+                                }
+                                // 流结束后，将Markdown转换为HTML显示
+                                botMessageContainer.innerHTML = convertMarkdownToHTML(botReply);
                             if (aiVoiceEnabled) {
                                 var playIcon = document.createElement('span');
                                 playIcon.classList.add('ai-tts-play');
-                                // 初始显示播放图标
-                                playIcon.innerHTML = '&#128266;'; // 扬声器图标
+                                playIcon.innerHTML = '&#128266;';
                                 playIcon.style.marginLeft = '10px';
 
-                                // 点击事件：第一次点击调用 AJAX 生成语音，并实现播放/暂停切换
                                 playIcon.addEventListener('click', function() {
-                                // 获取或创建用于播放音频的 <audio> 元素
-                                var audioElem = document.getElementById('ai-tts-audio');
-                                if (!audioElem) {
-                                audioElem = document.createElement('audio');
-                                audioElem.id = 'ai-tts-audio';
-                                audioElem.style.display = 'none';
-                                document.body.appendChild(audioElem);
-                            }
-                            // 如果已缓存音频 URL，则切换播放/暂停
-                                if (audioElem.audioUrls) {
-                                    if (!audioElem.paused) {
-                                audioElem.pause();
-                                playIcon.innerHTML = '&#128264;'; // 暂停状态图标
-                        } else {
-                            audioElem.play();
-                            playIcon.innerHTML = '&#128266;';
-                        }
-                        return;
-                    }
-                    // 第一次点击时调用 AJAX 接口生成语音（分段处理）
-                    var dataParams = new URLSearchParams();
-                    dataParams.append('action', 'deepseek_tts');
-                    dataParams.append('text', botReply);
-                    fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        },
-                        body: dataParams
-                    })
-                    .then(response => response.json())
-                    .then(ttsData => {
-                        if (ttsData.success) {
-                            var audio_urls = ttsData.data.audio_urls;
-                            if (audio_urls && audio_urls.length > 0) {
-                                // 缓存返回的音频 URL 数组到 audioElem，并初始化播放索引
-                                audioElem.audioUrls = audio_urls;
-                                audioElem.currentIndex = 0;
-                                audioElem.src = audio_urls[0];
-                                audioElem.play();
-                                playIcon.innerHTML = '&#128266;';
-                                // 依次播放所有分段语音
-                                audioElem.onended = function() {
-                                    audioElem.currentIndex++;
-                                    if (audioElem.currentIndex < audio_urls.length) {
-                                        audioElem.src = audio_urls[audioElem.currentIndex];
-                                        audioElem.play();
-                                    } else {
-                                        // 播放完毕后清除缓存，恢复播放图标
-                                        delete audioElem.audioUrls;
-                                        audioElem.currentIndex = 0;
-                                        playIcon.innerHTML = '&#128266;';
+                                    var audioElem = document.getElementById('ai-tts-audio');
+                                    if (!audioElem) {
+                                        audioElem = document.createElement('audio');
+                                        audioElem.id = 'ai-tts-audio';
+                                        audioElem.style.display = 'none';
+                                        document.body.appendChild(audioElem);
                                     }
-                                };
-                            }
-                        } else {
-                            alert('语音朗读失败：' + ttsData.data);
-                        }
-                    })
-                    .catch(function(){
-                        alert('请求错误，请重试。');
-                    });
-                });
-                // 语音播放图标添加到AI回复的容器中
-                botMessageContainer.appendChild(playIcon);
-            }
-        }
-    }
-    typeWriter();
+                                        // 先移除可能存在的旧提示
+                                    var existingMessage = playIcon.nextElementSibling;
+                                    if (existingMessage && existingMessage.classList.contains('tts-message')) {
+                                        existingMessage.remove();
+                                    }
 
-                    // 清空输入框
-                    document.getElementById('deepseek-chat-input').value = '';
+                                    // 创建“语音准备中”提示
+                                    var messageSpan = document.createElement('span');
+                                    messageSpan.classList.add('tts-message');
+                                    messageSpan.textContent = '语音准备中...';
+                                    messageSpan.style.marginLeft = '5px';
+                                    messageSpan.style.color = '#666';
+                                    playIcon.after(messageSpan);
 
-                    // 滚动消息框到最底部
-                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                                    if (audioElem.audioUrls) {
+                                        if (!audioElem.paused) {
+                                            audioElem.pause();
+                                            playIcon.innerHTML = '&#128264;';
+                                        } else {
+                                            audioElem.play();
+                                            playIcon.innerHTML = '&#128266;';
+                                        }
+                                        return;
+                                    }
+                                    var dataParams = new URLSearchParams();
+                                    dataParams.append('action', 'deepseek_tts');
+                                    dataParams.append('text', botReply);
+                                    fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/x-www-form-urlencoded',
+                                        },
+                                        body: dataParams
+                                    })
+                                    .then(response => response.json())
+                                    .then(ttsData => {
+                                        if (ttsData.success) {
+                                            var audio_urls = ttsData.data.audio_urls;
+                                            if (audio_urls && audio_urls.length > 0) {
+                                                audioElem.audioUrls = audio_urls;
+                                                audioElem.currentIndex = 0;
+                                                audioElem.src = audio_urls[0];
+                                                // 当音频开始播放时移除提示
+                                                audioElem.onplay = function() {
+                                                    messageSpan.remove();
+                                                };
 
-                    // 动态更新历史对话框
-                    if (!currentConversationId) {
-                        var historyContainer = document.querySelector('#deepseek-chat-history ul');
-                        var newChatItem = document.createElement('li');
-                        newChatItem.setAttribute('data-conversation-id', data.conversation_id);
-                        newChatItem.innerHTML = '<span class="deepseek-chat-title">' + data.conversation_title + '</span>' +
-                            '<button class="deepseek-delete-log" data-conversation-id="' + data.conversation_id + '">删除</button>';
-                        historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
+                                                audioElem.play();
+                                                playIcon.innerHTML = '&#128266;';
+                                                audioElem.onended = function() {
+                                                    audioElem.currentIndex++;
+                                                    if (audioElem.currentIndex < audio_urls.length) {
+                                                        audioElem.src = audio_urls[audioElem.currentIndex];
+                                                        audioElem.play();
+                                                    } else {
+                                                        delete audioElem.audioUrls;
+                                                        audioElem.currentIndex = 0;
+                                                        playIcon.innerHTML = '&#128266;';
+                                                    }
+                                                };
+                                            }
+                                        } else {
+                                            messageSpan.textContent = '语音朗读失败';
+                                            messageSpan.style.color = 'red';
+                                        }
+                                    })
+                                    .catch(() => {
+                                        messageSpan.textContent = '请求错误，请重试';
+                                        messageSpan.style.color = 'red';
+                                    });
+                                });
 
-                        // 绑定新历史记录的点击事件
-                        newChatItem.addEventListener('click', function() {
-                            loadChatLog(data.conversation_id);
-                        });
-
-                        // 绑定新历史记录的删除按钮事件
-                        newChatItem.querySelector('.deepseek-delete-log').addEventListener('click', function() {
-                            var conversationId = this.getAttribute('data-conversation-id');
-                            fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/x-www-form-urlencoded',
-                                },
-                                body: 'action=deepseek_delete_log&conversation_id=' + conversationId
-                            }).then(response => response.json())
-                            .then(data => {
-                                if (data.success) {
-                                    this.parentElement.remove();
-                                    // 清空消息框内容
-                                    document.getElementById('deepseek-chat-messages').innerHTML = '';
-                                    // 重置当前对话的conversation_id
-                                    currentConversationId = null;
+                                botMessageContainer.appendChild(playIcon);
                                 }
-                            });
+                                // 清空输入框
+                                document.getElementById('deepseek-chat-input').value = '';
+                                // 滚动消息框到最底部
+                                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                                return;
+                            }
+                            const chunk = decoder.decode(value, {stream: true});
+                            buffer += chunk;
+                            let lines = buffer.split("\n");
+                            // 将最后一行可能不完整的数据保留到buffer中
+                            buffer = lines.pop();
+                            lines.forEach(processLine);
+                            readStream();
                         });
-
-                        currentConversationId = data.conversation_id;
                     }
+                    readStream();
                 }
+            })
+        // 如果fetch请求出错，则将提示信息修改为“网络错误，请稍后重试”
+        .catch(error => {
+            console.error('Fetch request failed:', error);
+            var errorMsg = document.getElementById('deepseek-thinking-message');
+            if (errorMsg) {
+                errorMsg.innerHTML = '网络错误，请稍后重试';
             }
         });
-    }
-});
-
-// 图片生成处理函数
-function handleImageGeneration(taskId) {
-    var messagesContainer = document.getElementById('deepseek-chat-messages');
-    var thinkingMessage = document.getElementById('deepseek-thinking-message');
-    if (thinkingMessage) thinkingMessage.remove();
-
-    // 添加用户消息
-    var userMessage = document.createElement('div');
-    userMessage.className = 'message-bubble user';
-    userMessage.textContent = document.getElementById('deepseek-chat-input').value;
-    messagesContainer.appendChild(userMessage);
-
-    // 添加加载状态
-    var loadingContainer = document.createElement('div');
-    loadingContainer.className = 'message-bubble bot';
-    loadingContainer.innerHTML = '图片生成中...';
-    messagesContainer.appendChild(loadingContainer);
-
-    // 轮询检查任务状态
-    var checkInterval = setInterval(function() {
-        fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            body: 'action=deepseek_check_image_task&task_id=' + taskId
-        }).then(response => response.json())
-        .then(data => {
-            if (data.task_status === 'SUCCEEDED') {
-                clearInterval(checkInterval);
-                loadingContainer.remove();
-                
-                // 创建消息容器
-                var botMessage = document.createElement('div');
-                botMessage.className = 'message-bubble bot';
-
-                // 创建图片描述容器
-                var promptContainer = document.createElement('div');
-                promptContainer.className = 'image-prompt';
-                botMessage.appendChild(promptContainer);
-
-                // 创建图片容器
-                var imageContainer = document.createElement('img');
-                imageContainer.src = data.image_url;
-                imageContainer.style.maxWidth = '100%';
-                imageContainer.style.height = 'auto';
-                botMessage.appendChild(imageContainer);
-
-                // 将消息容器添加到消息框中
-                messagesContainer.appendChild(botMessage);
-
-                // 实现逐字显示效果
-                var actualPrompt = data.actual_prompt;
-                var index = 0;
-                var typingSpeed = 50; // 控制打字速度
-
-                function typeWriter() {
-                    if (index < actualPrompt.length) {
-                        promptContainer.innerHTML += actualPrompt.charAt(index); // 逐字添加
-                        index++;
-                        requestAnimationFrame(typeWriter, typingSpeed); // 延时调用自己，模拟逐字输入
-                    }
-                }
-
-                // 启动打字效果
-                typeWriter();
-
-                // 滚动消息框到最底部
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            }
-        });
-    }, 2000);
-}
-
-// 打字效果显示AI回复的函数
-function typeWriter(text, container, callback) {
-    var i = 0;
-    var speed = 50;
-    container.innerHTML = '';
-    
-    function addChar() {
-        if (i < text.length) {
-            container.innerHTML += text.charAt(i);
-            i++;
-            requestAnimationFrame(addChar, speed);
-        } else if (callback) {
-            callback();
         }
+    });
+
+    // 图片生成处理函数
+    function handleImageGeneration(taskId) {
+        var messagesContainer = document.getElementById('deepseek-chat-messages');
+        var thinkingMessage = document.getElementById('deepseek-thinking-message');
+        if (thinkingMessage) thinkingMessage.remove();
+
+        // 添加用户消息
+        var userMessage = document.createElement('div');
+        userMessage.className = 'message-bubble user';
+        userMessage.textContent = document.getElementById('deepseek-chat-input').value;
+        messagesContainer.appendChild(userMessage);
+
+        // 添加加载状态
+        var loadingContainer = document.createElement('div');
+        loadingContainer.className = 'message-bubble bot';
+        loadingContainer.innerHTML = '图片生成中...';
+        messagesContainer.appendChild(loadingContainer);
+
+        // 轮询检查任务状态
+        var checkInterval = setInterval(function() {
+            fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'action=deepseek_check_image_task&task_id=' + taskId
+            }).then(response => response.json())
+            .then(data => {
+                if (data.task_status === 'SUCCEEDED') {
+                    clearInterval(checkInterval);
+                    loadingContainer.remove();
+                    
+                    // 创建消息容器
+                    var botMessage = document.createElement('div');
+                    botMessage.className = 'message-bubble bot';
+
+                    // 创建图片描述容器
+                    var promptContainer = document.createElement('div');
+                    promptContainer.className = 'image-prompt';
+                    botMessage.appendChild(promptContainer);
+
+                    // 创建图片容器
+                    var imageContainer = document.createElement('img');
+                    imageContainer.src = data.image_url;
+                    imageContainer.style.maxWidth = '100%';
+                    imageContainer.style.height = 'auto';
+                    botMessage.appendChild(imageContainer);
+
+                    // 将消息容器添加到消息框中
+                    messagesContainer.appendChild(botMessage);
+
+                    // 实现逐字显示效果
+                    var actualPrompt = data.actual_prompt;
+                    var index = 0;
+                    var typingSpeed = 50; // 控制打字速度
+
+                    function typeWriter() {
+                        if (index < actualPrompt.length) {
+                            promptContainer.innerHTML += actualPrompt.charAt(index);
+                            index++;
+                            requestAnimationFrame(typeWriter, typingSpeed);
+                        }
+                    }
+                    typeWriter();
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }
+            });
+        }, 2000);
     }
-    addChar();
-}
 
+    // 打字效果显示AI回复的函数
+    function typeWriter(text, container, callback) {
+        var i = 0;
+        var speed = 50;
+        container.innerHTML = '';
+        
+        function addChar() {
+            if (i < text.length) {
+                container.innerHTML += text.charAt(i);
+                i++;
+                requestAnimationFrame(addChar, speed);
+            } else if (callback) {
+                callback();
+            }
+        }
+        addChar();
+    }
 
-    // 开启新对话
+    // 开启新对话时，清空消息区和localStorage中保存的当前对话ID
     document.getElementById('deepseek-new-chat').addEventListener('click', function() {
         document.getElementById('deepseek-chat-messages').innerHTML = '';
         document.getElementById('deepseek-chat-input').value = '';
-        currentConversationId = null; // 重置当前对话的conversation_id
+        setCurrentConversationId(null);
     });
-
 
     //加载历史对话记录时的内容渲染
     function loadChatLog(conversationId) {
@@ -1142,18 +1225,16 @@ function typeWriter(text, container, callback) {
         .then(data => {
             if (data.success) {
                 var messagesContainer = document.getElementById('deepseek-chat-messages');
-                messagesContainer.innerHTML = ''; // 清空当前内容
+                messagesContainer.innerHTML = '';
                 data.messages.forEach(message => {
-                // 用户消息直接显示（如果需要也可转换）
                     messagesContainer.innerHTML += '<div class="message-bubble user">' + message.message + '</div>';
-                    // AI 回复内容先调用转换函数，将纯 Markdown 转换成 HTML
                     messagesContainer.innerHTML += '<div class="message-bubble bot">' + convertMarkdownToHTML(message.response) + '</div>';
                 });
-                currentConversationId = conversationId; // 设置当前对话的 conversation_id
+                // 加载完历史对话后更新当前对话ID（同时存入localStorage）
+                setCurrentConversationId(conversationId);
             }
         });
     }
-
 
     // 绑定历史对话框的点击事件
     document.querySelectorAll('#deepseek-chat-history li').forEach(item => {
@@ -1162,7 +1243,6 @@ function typeWriter(text, container, callback) {
             loadChatLog(conversationId);
         });
 
-        // 绑定删除按钮事件
         var deleteButton = item.querySelector('.deepseek-delete-log');
         if (deleteButton) {
             deleteButton.addEventListener('click', function() {
@@ -1176,12 +1256,9 @@ function typeWriter(text, container, callback) {
                 }).then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        // 从历史对话框中移除
                         this.parentElement.remove();
-                        // 清空消息框内容
                         document.getElementById('deepseek-chat-messages').innerHTML = '';
-                        // 重置当前对话的conversation_id
-                        currentConversationId = null;
+                        setCurrentConversationId(null);
                     }
                 });
             });
@@ -1194,49 +1271,38 @@ function typeWriter(text, container, callback) {
 }
 add_shortcode('deepseek_chat', 'deepseek_chat_shortcode');
 
-// 处理AJAX请求
-function deepseek_send_message() {
+
+// 使用REST API 方式处理消息
+function deepseek_send_message_rest( WP_REST_Request $request ) {
     global $wpdb;
     $table_name = $wpdb->prefix . 'deepseek_chat_logs';
 
-    $message = sanitize_text_field($_POST['message']);
-    $conversation_id = isset($_POST['conversation_id']) ? intval($_POST['conversation_id']) : null;
+    $message = sanitize_text_field( $request->get_param('message') );
+    $conversation_id = $request->get_param('conversation_id') ? intval($request->get_param('conversation_id')) : null;
     $user_id = get_current_user_id();
     $interface_choice = get_option('chat_interface_choice', 'deepseek');
-
-    /*
-    $limit = 5;
-    if (mb_strlen($message, 'UTF-8') > $limit) {
-        $title = mb_substr($message, 0, $limit, 'UTF-8') . '...';
-    } else {
-        $title = $message;
-    }存储标题的时候截取 
-    */
 
     // 判断是否是图片生成模型
     $is_image_model = in_array(get_option('qwen_model'), ['wanx2.1-t2i-turbo', 'wanx2.1-t2i-plus']);
 
     if ($interface_choice === 'qwen' && $is_image_model) {
-        // 图片生成处理逻辑
+        // 图片生成分支（保持原有逻辑）
         $api_key = get_option('qwen_api_key');
         $model = get_option('qwen_model');
         $api_url = 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis';
 
-        // 准备请求头
         $headers = [
             'X-DashScope-Async: enable',
             'Authorization: Bearer ' . $api_key,
             'Content-Type: application/json'
         ];
 
-        // 构建请求体
         $body = [
             'model' => $model,
             'input' => ['prompt' => $message],
             'parameters' => ['size' => '1024*1024', 'n' => 1]
         ];
 
-        // 发送CURL请求
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $api_url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
@@ -1252,12 +1318,10 @@ function deepseek_send_message() {
             $response_data = json_decode($response, true);
             $task_id = $response_data['output']['task_id'];
             
-            // 保存初始请求记录（使用JSON格式保存任务信息）
             $wpdb->insert($table_name, [
                 'user_id' => $user_id,
                 'conversation_id' => $conversation_id ?: 0,
                 'conversation_title'  => $message,
-                //'conversation_title'  => $title, // 存储的时候截取
                 'message' => $message,
                 'response' => json_encode([
                     'task_id' => $task_id,
@@ -1266,7 +1330,6 @@ function deepseek_send_message() {
                 ])
             ]);
 
-            // 处理新对话ID
             if (!$conversation_id) {
                 $conversation_id = $wpdb->insert_id;
                 $wpdb->update($table_name, 
@@ -1275,7 +1338,6 @@ function deepseek_send_message() {
                 );
             }
 
-            // 返回成功响应，并立即更新历史对话框
             wp_send_json([
                 'success' => true,
                 'is_image' => true,
@@ -1290,7 +1352,7 @@ function deepseek_send_message() {
             ]);
         }
     } else {
-        // 文本对话处理逻辑
+        // 文本对话分支（流式返回）
         switch ($interface_choice) {
             case 'deepseek':
                 $api_key = get_option('deepseek_api_key');
@@ -1315,7 +1377,6 @@ function deepseek_send_message() {
             wp_send_json(['success' => false, 'message' => 'API Key 未设置']);
         }
 
-        // 构建对话历史
         $messages = [['role' => 'system', 'content' => 'You are a helpful assistant.']];
         if ($conversation_id) {
             $history = $wpdb->get_results($wpdb->prepare(
@@ -1332,14 +1393,20 @@ function deepseek_send_message() {
         }
         $messages[] = ['role' => 'user', 'content' => $message];
 
-        // 准备请求数据
         $data = [
             'model' => $model,
             'messages' => $messages,
-            'stream' => false
+            'stream' => true
         ];
 
-        // 发送请求
+        // 清空缓冲区，设置流式响应头
+        if (ob_get_length()) { ob_end_clean(); }
+        header('Content-Type: text/plain');
+        header('Cache-Control: no-cache');
+        header('Transfer-Encoding: chunked');
+        header('Connection: keep-alive');
+
+        $fullReply = '';
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $api_url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
@@ -1348,51 +1415,66 @@ function deepseek_send_message() {
         ]);
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-        $response = curl_exec($ch);
-        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        // 利用write callback实现流式输出，并累计完整回复
+        curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($ch, $chunk) use (&$fullReply) {
+            echo $chunk;
+            flush();
+            $fullReply .= $chunk;
+            return strlen($chunk);
+        });
+        curl_setopt($ch, CURLOPT_TIMEOUT, 0);
+        curl_exec($ch);
         curl_close($ch);
 
-        if ($http_code == 200) {
-            $response_data = json_decode($response, true);
-            $reply = $response_data['choices'][0]['message']['content'];
-
-            // 保存对话记录
-            $wpdb->insert($table_name, [
-                'user_id' => $user_id,
-                'conversation_id' => $conversation_id ?: 0,
-                'conversation_title' => $conversation_id ? '' : $message,
-                'message' => $message,
-                'response' => $reply
-            ]);
-
-            // 处理新对话ID
-            if (!$conversation_id) {
-                $conversation_id = $wpdb->insert_id;
-                $wpdb->update($table_name, 
-                    ['conversation_id' => $conversation_id], 
-                    ['id' => $conversation_id]
-                );
+        // 流式输出结束后，解析SSE数据提取有效内容并保存到数据库
+        $lines = explode("\n", $fullReply);
+        $processedReply = '';
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (strpos($line, 'data:') === 0) {
+                $dataPart = trim(substr($line, 5));
+                if ($dataPart === '[DONE]') {
+                    continue;
+                }
+                $jsonData = json_decode($dataPart, true);
+                if ($jsonData && isset($jsonData['choices'][0]['delta']['content'])) {
+                    $processedReply .= $jsonData['choices'][0]['delta']['content'];
+                }
             }
-
-            wp_send_json([
-                'success' => true, 
-                'message' => $reply,
-                'conversation_id' => $conversation_id,
-                'conversation_title'  => $message,
-            ]);
-        } else {
-            wp_send_json([
-                'success' => false, 
-                'message' => '请求失败 (HTTP ' . $http_code . '): ' . $response
-            ]);
         }
+        $reply = $processedReply;
+        $wpdb->insert($table_name, [
+            'user_id'             => $user_id,
+            'conversation_id'     => $conversation_id ?: 0,
+            'conversation_title'  => $conversation_id ? '' : $message,
+            'message'             => $message,
+            'response'            => $reply
+        ]);
+        if (!$conversation_id) {
+            $conversation_id = $wpdb->insert_id;
+            $wpdb->update($table_name, 
+                ['conversation_id' => $conversation_id], 
+                ['id' => $conversation_id]
+            );
+        }
+
+        // 输出一条SSE事件，将conversation_id返回给前端
+        echo "\n";
+        echo "data: " . json_encode(['conversation_id' => $conversation_id]) . "\n\n";
+        flush();
+
+        exit();
     }
 }
-
 add_action('wp_ajax_deepseek_send_message', 'deepseek_send_message');
 add_action('wp_ajax_nopriv_deepseek_send_message', 'deepseek_send_message');
+add_action('rest_api_init', function () {
+    register_rest_route('deepseek/v1', '/send-message', array(
+        'methods' => 'POST',
+        'callback' => 'deepseek_send_message_rest',
+        'permission_callback' => '__return_true',
+    ));
+});
 
 // 图片任务状态检查接口
 function deepseek_check_image_task() {
@@ -1419,11 +1501,9 @@ function deepseek_check_image_task() {
     if ($http_code == 200) {
         $response_data = json_decode($response, true);
         if ($response_data['output']['task_status'] === 'SUCCEEDED') {
-            // 获取实际参数
             $actual_prompt = $response_data['output']['results'][0]['actual_prompt'] ?? '';
             $image_url = $response_data['output']['results'][0]['url'] ?? '';
 
-            // 更新数据库记录
             $record = $wpdb->get_row($wpdb->prepare(
                 "SELECT * FROM $table_name WHERE response LIKE %s",
                 '%' . $wpdb->esc_like($task_id) . '%'
@@ -1466,7 +1546,6 @@ function deepseek_load_log() {
     $conversation_id = intval($_GET['conversation_id']);
     $user_id = get_current_user_id();
 
-    // 检查权限和获取记录
     $logs = $wpdb->get_results($wpdb->prepare(
         "SELECT * FROM $table_name 
         WHERE conversation_id = %d 
@@ -1483,11 +1562,9 @@ function deepseek_load_log() {
 
     $processed = array();
     foreach ($logs as $log) {
-        // 尝试解析JSON格式的响应
         $response = json_decode($log->response, true);
         
         if ($response && isset($response['image_url'])) {
-            // 处理图片消息
             $html = '<div class="image-prompt">'.esc_html($response['actual_prompt']).'</div>';
             $html .= '<img src="'.esc_url($response['image_url']).'" style="max-width:100%;height:auto;" />';
             $processed[] = array(
@@ -1495,7 +1572,6 @@ function deepseek_load_log() {
                 'response' => $html
             );
         } else {
-            // 处理文本消息直接返回原始Markdown格式文本
             $processed[] = array(
                 'message'  => $log->message,
                 'response' => $log->response
@@ -1870,7 +1946,7 @@ function deepseek_tts() {
         $segments[] = mb_substr($text, $i, $segment_length, 'UTF-8');
     }
 
-    // 从 wpatai_settings 中读取语音合成接口设置
+    // 从wpatai_settings中读取语音合成接口设置
     $options = get_option('wpatai_settings');
     $interface = isset($options['tts_interface']) ? $options['tts_interface'] : 'tencent';
 

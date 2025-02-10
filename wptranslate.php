@@ -512,7 +512,7 @@ function wpatai_translate_content( $html, $target_language, $translation_type, $
     return $final_html;
 }
 
-// 调用指定 AI 接口进行翻译
+// 调用指定AI接口进行翻译
 function wpatai_call_api( $prompt, $selected_api, $options ) {
     // 初始化返回错误变量
     $last_error = null;
@@ -653,9 +653,9 @@ function wpatai_call_api( $prompt, $selected_api, $options ) {
 }
 
 
-// 腾讯云 TTS 接口合成语音(官方API Explorer的代码示例)
+// 腾讯云TTS接口合成语音(官方API Explorer的代码示例)
 function wpatai_call_tts_api( $text, $secret_id, $secret_key, $voice_type = 0 ) {
-    // 腾讯 TTS 接口基本参数
+    // 腾讯TTS接口基本参数
     $service    = "tts";
     $host       = "tts.tencentcloudapi.com";
     $req_region = "";
@@ -733,10 +733,10 @@ function wpatai_call_tts_api( $text, $secret_id, $secret_key, $voice_type = 0 ) 
         return new WP_Error( 'tts_api_error', '语音合成API错误: ' . $result['Response']['Error']['Message'] );
     }
     
-    // 腾讯 TTS 返回的 Audio 字段为 base64 编码的音频数据
+    // 腾讯TTS返回的Audio字段为base64编码的音频数据
     if ( isset( $result['Response']['Audio'] ) ) {
         $audio_base64 = $result['Response']['Audio'];
-        // 生成 data URI 格式的音频链接（mp3格式）
+        // 生成data URI格式的音频链接（mp3格式）
         $audio_data_uri = 'data:audio/mp3;base64,' . $audio_base64;
         return $audio_data_uri;
     } else {
@@ -744,9 +744,9 @@ function wpatai_call_tts_api( $text, $secret_id, $secret_key, $voice_type = 0 ) 
     }
 }
 
-// 百度云 TTS 接口合成语音
+// 百度云TTS接口合成语音
 function wpatai_call_baidu_tts_api( $text, $api_key, $secret_key, $per = 0 ) {
-    // 首先获取 access token
+    // 获取access token
     $token = wpatai_get_baidu_access_token( $api_key, $secret_key );
     if ( is_wp_error( $token ) ) {
         return $token;
