@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: 小半WordPress ai助手
-Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结，可对接deepseek、通义千问、豆包模型。
+Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结，可对接deepseek、通义千问、豆包等模型。
 Plugin URI: https://www.jingxialai.com/4827.html
 Version: 2.6
 Author: Summer
@@ -836,7 +836,7 @@ function deepseek_chat_shortcode() {
                     let botReply = '';
                     let buffer = '';
                     
-                    // 修改后的processLine函数：在解析到conversation_id时，如果是新对话则更新历史记录
+                    // 修改后的processLine函数 在解析到conversation_id时，如果是新对话则更新历史记录
                     function processLine(line) {
                         line = line.trim();
                         if (!line.startsWith("data:")) return;
@@ -1912,7 +1912,7 @@ function deepseek_render_article_generator_page() {
     </div>
 
     <script>
-    // 监听生成文章按钮点击事件，使用 SSE 流式获取文章内容
+    // 监听生成文章按钮点击事件，使用SSE流式获取文章内容
     document.getElementById('generate-button').addEventListener('click', function() {
         // 显示“正在生成中”提示
         document.getElementById('generation-status').style.display = 'block';
@@ -1943,7 +1943,7 @@ function deepseek_render_article_generator_page() {
                         }
                     }
                 } catch (e) {
-                    console.error("解析 SSE 数据错误", e);
+                    console.error("解析SSE数据错误", e);
                 }
             };
             eventSource.addEventListener('done', function(event) {
@@ -1963,7 +1963,7 @@ function deepseek_render_article_generator_page() {
             };
         } else {
             document.getElementById('generation-status').style.display = 'none';
-            alert("您的浏览器不支持服务器发送事件 (SSE)，请使用支持 SSE 的浏览器。");
+            alert("您的浏览器不支持服务器发送事件 (SSE)，请使用支持SSE的浏览器。");
         }
     });
 
@@ -2001,7 +2001,7 @@ function deepseek_render_article_generator_page() {
     <?php
 }
 
-// SSE 流式文章生成处理函数
+// SSE流式文章生成处理函数
 function deepseek_generate_article_stream_ajax() {
     // 关闭用户中断和执行时间限制
     ignore_user_abort(true);
@@ -2176,5 +2176,31 @@ function deepseek_tts() {
 }
 add_action('wp_ajax_deepseek_tts', 'deepseek_tts');
 add_action('wp_ajax_nopriv_deepseek_tts', 'deepseek_tts');
+
+// 插件卸载时删除相关设置项
+function deepseek_uninstall() {
+    delete_option('deepseek_api_key');
+    delete_option('deepseek_model');
+    delete_option('doubao_api_key');
+    delete_option('doubao_model');
+    delete_option('kimi_api_key');
+    delete_option('kimi_model');
+    delete_option('openai_api_key');
+    delete_option('openai_model');
+    delete_option('qianfan_api_key');
+    delete_option('qianfan_model');
+    delete_option('qwen_text_model');
+    delete_option('qwen_image_model');
+    delete_option('qwen_enable_image');
+    delete_option('custom_api_key');
+    delete_option('custom_model_params');
+    delete_option('custom_model_url');
+    delete_option('chat_interface_choice');
+    delete_option('show_ai_helper');
+    delete_option('enable_ai_summary');
+    delete_option('enable_ai_voice_reading');
+    delete_option('deepseek_custom_prompts');
+}
+register_uninstall_hook(__FILE__, 'deepseek_uninstall');
 
 ?>
