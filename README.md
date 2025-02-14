@@ -69,4 +69,4 @@ php版本：php 8.0
 
 
 
-![WordPressai.png](https://github.com/suqicloud/wp-ai-chat/blob/main/2025020801.jpg)
+![WordPressai.png](https://i.miji.bid/2025/02/14/2a5c7bcd11a8433c7311638b8a6b8f76.jpeg)
