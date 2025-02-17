@@ -3,7 +3,7 @@
 # 小半WordPress ai助手  
 
 [![License](https://img.shields.io/badge/license-GPL-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.6-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/2.6)
+[![Version](https://img.shields.io/badge/version-2.7-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/2.7)
 [![WordPress](https://img.shields.io/badge/WordPress-6.7-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.0-orange.svg)](https://www.php.net/)
 
@@ -11,7 +11,7 @@
 
 ## 📌 项目简介
 
-全开源免费 - WordPress ai助手插件，可实现：ai对话、ai文章生成、ai文章总结、ai文章翻译、文章内容朗读、ai回复内容朗读。  
+全开源免费 - WordPress ai助手插件，可实现：ai对话、ai文章生成、ai文章总结、ai文章翻译、文章内容朗读、ai回复内容朗读、ai生成PPT。  
 
 需要网站开启REST API服务，有的用户优化wp的时候可能会关掉REST API。  
 
@@ -40,6 +40,7 @@
 21.支持对接腾讯云、百度云TTS服务实现朗读文章内容  
 22.可以实现朗读ai回复的文字内容  
 23.可以自定义提示词  
+24.支持对接文多多aippt实现生成PPT
 
 
 ## 📥 安装
@@ -57,7 +58,9 @@ php版本：php 8.0
 
 插件启用会自动创建一个前台对话页面。如果没有自动创建，就自己手动加短代码：  [deepseek_chat]  
 
-文章翻译的接口要单独设置，因为这本来是我另外一个插件的，我合并过来了，不想折腾，就直接用了，  
+1 - 文章翻译的接口要单独设置，因为这本来是我另外一个插件的，我合并过来了，不想折腾，就直接用了。 
+2 - ai生成PPT也是独立插件进行的合并，并且这个功能原本是根据我自己用的主题调整的，可能兼容性不好。  
+
 
 如果插件不用了，自己到数据库去删掉这个数据表：deepseek_chat_logs  
 
@@ -70,3 +73,4 @@ php版本：php 8.0
 
 
 ![WordPressai.png](https://i.miji.bid/2025/02/14/2a5c7bcd11a8433c7311638b8a6b8f76.jpeg)
+![a979fdb418172e3cbb8241d211e5fff5.jpeg](https://i.miji.bid/2025/02/17/a979fdb418172e3cbb8241d211e5fff5.jpeg)
