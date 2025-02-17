@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结，可对接deepseek、通义千问、豆包等模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 2.6
+Version: 2.7
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -37,6 +37,10 @@ function deepseek_create_table() {
 register_activation_hook(__FILE__, 'deepseek_create_table');
 
 require_once plugin_dir_path(__FILE__) . 'wptranslate.php';
+require_once plugin_dir_path(__FILE__) . 'wpaippt.php';
+
+// 激活子文件的创建ppt页面
+register_activation_hook(__FILE__, 'docmee_create_ppt_page');
 
 // 插件列表页面添加设置入口
 function deepseek_add_settings_link($links) {
@@ -48,9 +52,16 @@ add_filter('plugin_action_links_' . plugin_basename(__FILE__), 'deepseek_add_set
 
 // 创建对话页面
 function deepseek_create_chat_page() {
-    // 检查页面是否已经存在
-    $page = get_page_by_path('deepseek-chat');
-    if (!$page) {
+    // 查询是否已有包含短代码 [deepseek_chat] 的页面
+    $pages = get_posts(array(
+        'post_type'   => 'page', // 只查询页面
+        'post_status' => 'publish', // 只查询已发布的页面
+        's'           => '[deepseek_chat]', // 搜索包含短代码的内容
+        'numberposts' => 1, // 只获取一个结果
+    ));
+
+    // 如果没有找到包含短代码的页面
+    if (empty($pages)) {
         // 创建页面
         $page_id = wp_insert_post(array(
             'post_title'    => 'Ai小助手',
@@ -58,7 +69,6 @@ function deepseek_create_chat_page() {
             'post_status'   => 'publish',
             'post_author'   => 1,
             'post_type'     => 'page',
-           // 'post_name'     => 'aichat'
         ));
     }
 }
@@ -112,6 +122,15 @@ function deepseek_add_menu() {
         'deepseek-translate',
         'wpatai_settings_page' // 翻译页面回调函数
     );
+    // 子菜单项 - 翻译朗读
+    add_submenu_page(
+        'deepseek',
+        'PPT生成',
+        'PPT生成',
+        'manage_options',
+        'deepseek-aippt',
+        'wpaippt_settings_page' // 翻译页面回调函数
+    );    
     
 }
 add_action('admin_menu', 'deepseek_add_menu');
@@ -179,7 +198,7 @@ function deepseek_register_settings() {
     //通义千问图片
     add_settings_field('qwen_enable_image', '启用图片生成', 'qwen_enable_image_callback', 'deepseek-chat', 'deepseek_main_section');
     // 文章总结框
-    add_settings_field('enable_ai_summary', '文章AI总结(需要文本模型)', 'enable_ai_summary_callback', 'deepseek-chat', 'deepseek_main_section');
+    add_settings_field('enable_ai_summary', '文章AI总结(需要长文本模型)', 'enable_ai_summary_callback', 'deepseek-chat', 'deepseek_main_section');
     // ai入口
     add_settings_field('show_ai_helper', '网站前台显示AI助手入口', 'show_ai_helper_callback', 'deepseek-chat', 'deepseek_main_section');
     // AI对话语音朗读
@@ -1162,7 +1181,7 @@ function deepseek_chat_shortcode() {
         }
     });
 </script>
-<!-- 自定义提示词点击事件，点击后自动将提示词加上分号插入输入框 -->
+<!-- 自定义提示词点击事件，点击后自动将提示词加上冒号插入输入框 -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     var prompts = document.querySelectorAll('.deepseek-prompt');
@@ -1171,7 +1190,7 @@ document.addEventListener('DOMContentLoaded', function() {
             var inputBox = document.getElementById('deepseek-chat-input');
             if (inputBox) {
                 var promptText = this.textContent.trim();
-                // 如果输入框内容不以该提示词开头，则预置提示词和冒号
+                // 输入框内容预置提示词和冒号
                 if (!inputBox.value.startsWith(promptText + ':')) {
                     inputBox.value = promptText + ': ' + inputBox.value;
                 }
