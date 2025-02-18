@@ -11,7 +11,7 @@
 
 ## 📌 项目简介
 
-全开源免费 - WordPress ai助手插件，可实现：ai对话、ai文章生成、ai文章总结、ai文章翻译、文章内容朗读、ai回复内容朗读、ai生成PPT。  
+全开源免费 - WordPress ai助手插件，可实现：ai对话聊天、ai对话语音播放、ai文章生成、ai文章总结、ai文章翻译、ai生成PPT、文章内容语音播放。  
 
 需要网站开启REST API服务，有的用户优化wp的时候可能会关掉REST API。  
 
