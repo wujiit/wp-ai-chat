@@ -3,7 +3,7 @@
 # 小半WordPress ai助手  
 
 [![License](https://img.shields.io/badge/license-GPL-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.9-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/2.9)
+[![Version](https://img.shields.io/badge/version-3.0-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/3.0)
 [![WordPress](https://img.shields.io/badge/WordPress-6.7-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.0-orange.svg)](https://www.php.net/)
 
@@ -43,7 +43,8 @@
 23.可以自定义提示词  
 24.支持对接文多多aippt实现生成PPT  
 25.自定义提示词教程  
-26.Markdown内容板块会自动加载复制按钮
+26.Markdown内容板块会自动加载复制按钮  
+27.支持违规关键词检测
 
 
 ## 📥 安装
