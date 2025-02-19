@@ -38,7 +38,10 @@ function docmee_register_settings() {
     register_setting('docmee_options', 'docmee_api_key'); // apikey
     register_setting('docmee_options', 'docmee_token_limit');  // 限制生成次数
     register_setting('docmee_options', 'docmee_container_width'); // 宽度设置
-    register_setting('docmee_options', 'docmee_ppt_height'); // 高度设置    
+    register_setting('docmee_options', 'docmee_ppt_height'); // 高度设置
+    register_setting('docmee_options', 'docmee_vip_check_enabled', 'intval'); //会员开通设置 
+    register_setting('docmee_options', 'docmee_vip_prompt_page'); //会员开通页面  
+    register_setting('docmee_options', 'docmee_vip_keyword'); // 会员关键词设置    
 }
 
 // 设置页面
@@ -159,15 +162,42 @@ function wpaippt_settings_page() {
                                min="100"/>
                         <span class="description">例如: 800px</span>
                     </td>
-                </tr>                
+                </tr>
+                <!-- 新增会员验证设置 -->
+                <tr valign="top">
+                    <th scope="row">启用网站会员验证</th>
+                    <td>
+                        <input type="checkbox" name="docmee_vip_check_enabled" 
+                            value="1" <?php checked(1, get_option('docmee_vip_check_enabled'), true); ?>/>
+                        <span class="description">启用后未开通网站会员的用户将无法使用aippt功能</span>
+                    </td>
+                </tr>
+                <tr valign="top">
+                    <th scope="row">会员验证关键词</th>
+                    <td>
+                        <input type="text" name="docmee_vip_keyword" value="<?php echo esc_attr(get_option('docmee_vip_keyword', '升级VIP享受精彩下载')); ?>" style="width:400px;"/>
+                        <span class="description">设置会员验证时的提示关键词</span>
+                    </td>
+                </tr>
+
+                <tr valign="top">
+                    <th scope="row">开通会员页面链接</th>
+                    <td>
+                        <input type="text" name="docmee_vip_prompt_page" 
+                            value="<?php echo esc_attr(get_option('docmee_vip_prompt_page')); ?>" 
+                            style="width:400px;"/>
+                        <span class="description">用户点击开通按钮后跳转的页面URL</span>
+                    </td>
+                </tr>                                
             </table>
             <?php submit_button(); ?>
         </form>
         <div class="success-message"></div>
         <p>1、会自动创建一个前台页面，如果没有创建，就手动创建，短代码: [docmee_ppt] <br>
-            2、文多多AiPPT开放平台: https://docmee.cn/open-platform <br>
-            3、文多多的单价较低，加上有UI接入方式，不用自己写前端，方便接入<br>
-        4、如果你不用这个功能，可以去把自动创建的页面删掉，有问题可以进QQ群: 16966111</p>
+            2、文多多AiPPT开放平台: <a href="https://docmee.cn?source=u70533" target="_blank">https://docmee.cn/open-platform</a> <br>
+            3、文多多的单价较低，加上有UI接入方式，不用自己写前端，方便接入。<br>
+            4、很多WordPress网站都有自己的付费会员系统，可以通过会员和非会员特有关键词来判断会员权限。<br>
+        5、如果你不用这个功能，可以去把自动创建的页面删掉，有问题可以进QQ群: 16966111</p>
     </div>
 
     <script type="text/javascript">
@@ -196,41 +226,89 @@ function wpaippt_settings_page() {
     <?php
 }
 
-// 加载未登录提示的CSS
+// 会员验证功能实现
+add_action('template_redirect', 'docmee_start_output_buffer');
+function docmee_start_output_buffer() {
+    if (is_admin()) return;
+
+    $vip_check_enabled = get_option('docmee_vip_check_enabled');
+    if (!$vip_check_enabled) return;
+
+    global $post;
+    if (is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'docmee_ppt') && is_user_logged_in()) {
+        ob_start();
+        add_action('shutdown', 'docmee_check_vip_prompt', 0);
+    }
+}
+
+function docmee_check_vip_prompt() {
+    $html = ob_get_clean();
+
+    $target_string = get_option('docmee_vip_keyword', '升级VIP享受精彩下载');  // 默认值为 "升级VIP享受精彩下载" Modown主题是这个
+    $vip_prompt_page = get_option('docmee_vip_prompt_page');
+
+    if (strpos($html, $target_string) !== false && !empty($vip_prompt_page)) {
+        $prompt = '
+        <div id="vip-prompt-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:99998;backdrop-filter:blur(3px);">
+            <div id="vip-prompt" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;padding:30px 40px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,0.2);text-align:center;z-index:99999;min-width:380px;">
+                <h3 style="margin:0 0 20px 0;font-size:20px;color:#333;">🔒 赞助商专属功能</h3>
+                <p style="margin:0 0 25px 0;font-size:16px;color:#666;">请先开通赞助商才能使用ai生成PPT服务</p>
+                <div style="display:flex;gap:15px;justify-content:center;">
+                    <button onclick="handleVipAction(\'confirm\')" style="padding:12px 30px;background:#0073aa;color:#fff;border:none;border-radius:25px;cursor:pointer;font-size:16px;transition:all 0.3s;flex:1;">
+                        ⚡ 立即开通
+                    </button>
+                </div>
+            </div>
+        </div>
+        <script>
+            // 禁止滚动条出现
+            document.body.style.overflow = "hidden";
+            
+            // 统一操作处理
+            function handleVipAction(type) {
+                const overlay = document.getElementById("vip-prompt-overlay");
+                if (type === "confirm") {
+                    window.location.href = "'.esc_url($vip_prompt_page).'";
+                } else {
+                    overlay.style.display = "none";
+                    document.body.style.overflow = "auto";
+                }
+            }
+
+            // 禁用ESC键关闭
+            document.addEventListener("keydown", function(e) {
+                if (e.key === "Escape") {
+                    e.preventDefault();
+                }
+            });
+
+            // 禁用右键菜单
+            document.addEventListener("contextmenu", function(e) {
+                e.preventDefault();
+            }, false);
+        </script>';
+        
+        $html = str_replace('</body>', $prompt.'</body>', $html);
+    }
+    echo $html;
+}
+
+// 加载未登录提示的动画CSS
 function docmee_custom_login_message_styles() {
     $post = get_post();
     
-    // 判断是否有 [docmee_ppt] 短代码
     if ($post && has_shortcode($post->post_content, 'docmee_ppt')) {
         ?>
         <style>
-        .docmee-login-message {
-            height: 300px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 15px 30px;
-            margin-top: 20px;
-            background: linear-gradient(135deg, #6A4C9C, #3A77B1);
-            color: white;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: bold;
-            text-align: center;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            animation: fadeInMessage 1s ease-out;
+        #vip-prompt-overlay {
+            transition: opacity 0.3s ease;
         }
-
-        /* 提示框弹入动画 */
-        @keyframes fadeInMessage {
-            0% {
-                opacity: 0;
-                transform: translateY(-20px);
-            }
-            100% {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        #vip-prompt {
+            animation: popIn 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+        }
+        @keyframes popIn {
+            0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
         }
         </style>
         <?php
@@ -242,9 +320,7 @@ add_action('wp_head', 'docmee_custom_login_message_styles');
 // 短码处理
 add_shortcode('docmee_ppt', 'docmee_ppt_shortcode');
 function docmee_ppt_shortcode() {
-    if (!is_user_logged_in()) {
-        return '<div class="docmee-login-message">请先登录才能使用AI生成PPT服务</div>';
-    }
+
     // 生成nonce
     $nonce = wp_create_nonce('docmee_generate_token_nonce');
 
@@ -257,17 +333,47 @@ function docmee_ppt_shortcode() {
 
     // 完整样式输出
     ob_start(); ?>
+    <?php if (!is_user_logged_in()): // 添加登录提示层 ?>
+    <div id="vip-prompt-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:99998;backdrop-filter:blur(3px);">
+        <div id="vip-prompt" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;padding:30px 40px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,0.2);text-align:center;z-index:99999;min-width:380px;">
+            <h3 style="margin:0 0 20px 0;font-size:20px;color:#333;">🔒 登录后使用</h3>
+            <p style="margin:0 0 25px 0;font-size:16px;color:#666;">请先登录才能使用AI生成PPT服务</p>
+            <div style="display:flex;gap:15px;justify-content:center;">
+                <button onclick="handleLoginAction('confirm')" style="padding:12px 30px;background:#0073aa;color:#fff;border:none;border-radius:25px;cursor:pointer;font-size:16px;transition:all 0.3s;flex:1;">
+                    ⚡ 立即登录
+                </button>
+            </div>
+        </div>
+    </div>
+    <script>
+        // 登录操作处理
+        function handleLoginAction(type) {
+            const overlay = document.getElementById("vip-prompt-overlay");
+            if (type === "confirm") {
+                window.location.href = "<?php echo wp_login_url(get_permalink()); ?>";
+            } else {
+                overlay.style.display = "none";
+                document.body.style.overflow = "auto";
+            }
+        }
+    </script>
+    <?php endif; ?>
+
     <div class="docmee-container-wrapper" style="width: <?php echo esc_attr($container_width); ?>;">
         <!-- 导航 -->
         <div class="page_navigate">
-<div id="page_creator" class="selected">生成PPT</div>
-<div id="page_dashboard">PPT列表</div>
-<div id="page_customTemplate">自定义模板</div>
+            <div id="page_creator" class="selected">生成PPT</div>
+            <div id="page_dashboard">PPT列表</div>
+            <div id="page_customTemplate">自定义模板</div>
         </div>
         <div id="message-box" style="display:none; padding: 10px; margin-top: 20px; background-color: #f57bb0; color: white; border-radius: 5px; text-align: center;"></div>
         
         <!-- 主容器 -->
-        <div id="docmee-ppt-container" style="height: <?php echo esc_attr($ppt_height); ?>px;"></div>
+        <div id="docmee-ppt-container" style="height: <?php echo esc_attr($ppt_height); ?>px;">
+            <?php if (!is_user_logged_in()): ?>
+                <div style="position:absolute;top:0;left:0;width:100%;height:100%;backdrop-filter:blur(2px);z-index:9997;"></div>
+            <?php endif; ?>
+        </div>
     </div>
 <style>        
     .docmee-container-wrapper {
