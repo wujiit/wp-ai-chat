@@ -3,7 +3,7 @@
 # 小半WordPress ai助手  
 
 [![License](https://img.shields.io/badge/license-GPL-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.7-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/2.7)
+[![Version](https://img.shields.io/badge/version-2.8-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/2.8)
 [![WordPress](https://img.shields.io/badge/WordPress-6.7-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.0-orange.svg)](https://www.php.net/)
 
@@ -14,7 +14,7 @@
 全开源免费 - WordPress ai助手插件，可实现：ai对话聊天、ai对话语音播放、ai文章生成、ai文章总结、ai文章翻译、ai生成PPT、文章内容语音播放。  
 
 说明1：聊天对话需要网站开启REST API服务，有的用户优化wp的时候可能会关掉REST API。  
-说明2：有的网站缓存配置会导致历史对话无法正常显示ai回复内容。
+说明2：有的网站缓存配置可能会导致对话无法正常使用，请排除对话页面的缓存。
 
 ## 🚀 功能特性
 
