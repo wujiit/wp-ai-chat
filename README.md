@@ -3,7 +3,7 @@
 # 小半WordPress ai助手  
 
 [![License](https://img.shields.io/badge/license-GPL-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.8-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/2.8)
+[![Version](https://img.shields.io/badge/version-2.9-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/2.9)
 [![WordPress](https://img.shields.io/badge/WordPress-6.7-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.0-orange.svg)](https://www.php.net/)
 
@@ -41,7 +41,9 @@
 21.支持对接腾讯云、百度云TTS服务实现朗读文章内容  
 22.可以实现朗读ai回复的文字内容  
 23.可以自定义提示词  
-24.支持对接文多多aippt实现生成PPT
+24.支持对接文多多aippt实现生成PPT  
+25.自定义提示词教程  
+26.Markdown内容板块会自动加载复制按钮
 
 
 ## 📥 安装
