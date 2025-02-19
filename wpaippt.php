@@ -251,8 +251,8 @@ function docmee_check_vip_prompt() {
         $prompt = '
         <div id="vip-prompt-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:99998;backdrop-filter:blur(3px);">
             <div id="vip-prompt" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;padding:30px 40px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,0.2);text-align:center;z-index:99999;min-width:380px;">
-                <h3 style="margin:0 0 20px 0;font-size:20px;color:#333;">🔒 会员专属功能</h3>
-                <p style="margin:0 0 25px 0;font-size:16px;color:#666;">请先开通会员才能使用ai生成PPT服务</p>
+                <h3 style="margin:0 0 20px 0;font-size:20px;color:#333;">🔒 赞助商专属功能</h3>
+                <p style="margin:0 0 25px 0;font-size:16px;color:#666;">请先开通赞助商才能使用ai生成PPT服务</p>
                 <div style="display:flex;gap:15px;justify-content:center;">
                     <button onclick="handleVipAction(\'confirm\')" style="padding:12px 30px;background:#0073aa;color:#fff;border:none;border-radius:25px;cursor:pointer;font-size:16px;transition:all 0.3s;flex:1;">
                         ⚡ 立即开通

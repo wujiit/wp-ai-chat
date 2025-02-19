@@ -324,6 +324,73 @@ body {
     background-color: #005177;
 }
 
+/* 复制按钮样式 */
+.pre-copy-button {
+    display: inline-block;
+    background: linear-gradient(90deg, #0073aa, #005177);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    margin-top: 2px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 80px;
+    text-align: center;
+}
+
+.pre-copy-button:hover {
+    background: linear-gradient(90deg, #005177, #003d5a);
+    transform: translateX(-50%) translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.pre-copy-button:active {
+    transform: translateX(-50%) scale(0.98);
+}
+
+ /* 使用教程按钮 */
+#deepseek-tutorial-link {
+    margin-top: 10px;
+    margin-bottom: 10px;
+    text-align: center;
+    display: inline-block;
+    margin-left: auto;
+    margin-right: auto;
+    background-image: linear-gradient(to right, #6a11cb 0%, #2575fc 100%);
+    border: none;
+    border-radius: 8px;
+    padding: 12px 20px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+}
+
+#deepseek-tutorial-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    background-image: linear-gradient(to left, #6a11cb 0%, #2575fc 100%);
+}
+
+#deepseek-tutorial-link a {
+    color: #ffffff;
+    text-decoration: none;
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0.025em;
+    transition: color 0.3s ease;
+}
+
+#deepseek-tutorial-link a:hover {
+    color: #f3f4f6;
+    text-decoration: none;
+}
+
 /* 响应式优化 */
 @media (max-width: 768px) {
     #deepseek-chat-container {

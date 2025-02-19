@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结，可对接deepseek、通义千问、豆包等模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 2.8
+Version: 2.9
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -162,6 +162,8 @@ function deepseek_register_settings() {
     register_setting('deepseek_chat_options_group', 'enable_ai_summary'); // 文章总结
     register_setting('deepseek_chat_options_group', 'enable_ai_voice_reading'); // AI对话语音朗读
     register_setting('deepseek_chat_options_group', 'deepseek_custom_prompts'); // 自定义提示词
+    register_setting('deepseek_chat_options_group', 'ai_tutorial_title'); // AI使用教程标题
+    register_setting('deepseek_chat_options_group', 'ai_tutorial_url');   // AI使用教程链接    
 
     add_settings_section('deepseek_main_section', '基础设置', null, 'deepseek-chat');
     // DeepSeek配置项
@@ -206,8 +208,22 @@ function deepseek_register_settings() {
     add_settings_field('enable_ai_voice_reading', 'AI对话语音朗读', 'enable_ai_voice_reading_callback', 'deepseek-chat', 'deepseek_main_section');
     // 自定义提示词
     add_settings_field('deepseek_custom_prompts', '自定义提示词', 'deepseek_custom_prompts_callback', 'deepseek-chat', 'deepseek_main_section');
+    // AI使用教程标题
+    add_settings_field('ai_tutorial_title', '提示词教程标题', 'ai_tutorial_title_callback', 'deepseek-chat', 'deepseek_main_section');
+    // AI使用教程链接 
+    add_settings_field('ai_tutorial_url', '提示词教程链接', 'ai_tutorial_url_callback', 'deepseek-chat', 'deepseek_main_section');    
 }
 add_action('admin_init', 'deepseek_register_settings');
+
+// AI使用教程标题回调函数
+function ai_tutorial_title_callback() {
+    $title = get_option('ai_tutorial_title', '');
+    echo '<input type="text" name="ai_tutorial_title" value="' . esc_attr($title) . '" style="width: 500px;" />';
+}
+function ai_tutorial_url_callback() {
+    $url = get_option('ai_tutorial_url', '');
+    echo '<input type="text" name="ai_tutorial_url" value="' . esc_attr($url) . '" style="width: 500px;" />';
+}
 
 // 自定义提示词回调函数
 function deepseek_custom_prompts_callback() {
@@ -699,6 +715,16 @@ function deepseek_chat_shortcode() {
             <textarea id="deepseek-chat-input" placeholder="输入你的消息..." rows="4"></textarea>
             <button id="deepseek-chat-send">发送</button>
         </div>
+            <?php
+            // 显示AI使用教程链接
+            $tutorial_title = get_option('ai_tutorial_title', '');
+            $tutorial_url = get_option('ai_tutorial_url', '');
+            if (!empty($tutorial_title) && !empty($tutorial_url)) {
+                echo '<div id="deepseek-tutorial-link">';
+                echo '<a href="' . esc_url($tutorial_url) . '" target="_blank">' . esc_html($tutorial_title) . '</a>';
+                echo '</div>';
+            }
+        ?>         
     </div>
 </div>
         <?php

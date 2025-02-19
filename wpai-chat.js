@@ -447,17 +447,49 @@ document.getElementById('deepseek-new-chat').addEventListener('click', function(
     setCurrentConversationId(null);
 });
 
+// 复制按钮pre标签的函数
+function addCopyButtonsToPreTags(container) {
+    const preTags = container.querySelectorAll('pre');
+    preTags.forEach(pre => {
+        const copyButton = document.createElement('button');
+        copyButton.textContent = '复制';
+        copyButton.classList.add('pre-copy-button');
+        copyButton.addEventListener('click', () => {
+            const textToCopy = pre.textContent;
+            navigator.clipboard.writeText(textToCopy)
+              .then(() => {
+                    console.log('复制成功');
+                    // 修改按钮文本
+                    const originalText = copyButton.textContent;
+                    copyButton.textContent = '复制成功';
+                    setTimeout(() => {
+                        copyButton.textContent = originalText;
+                    }, 1500);
+                })
+              .catch(err => {
+                    console.error('复制失败: ', err);
+                });
+        });
+        pre.parentNode.insertBefore(copyButton, pre.nextSibling);
+    });
+}
+
 //加载历史对话记录时的内容渲染
 function loadChatLog(conversationId) {
     fetch(adminAjaxUrl + '?action=deepseek_load_log&conversation_id=' + conversationId)
-    .then(response => response.json())
-    .then(data => {
+   .then(response => response.json())
+   .then(data => {
         if (data.success) {
             var messagesContainer = document.getElementById('deepseek-chat-messages');
             messagesContainer.innerHTML = '';
             data.messages.forEach(message => {
                 messagesContainer.innerHTML += '<div class="message-bubble user">' + message.message + '</div>';
-                messagesContainer.innerHTML += '<div class="message-bubble bot">' + convertMarkdownToHTML(message.response) + '</div>';
+                const botMessageElement = document.createElement('div');
+                botMessageElement.classList.add('message-bubble', 'bot');
+                botMessageElement.innerHTML = convertMarkdownToHTML(message.response);
+                messagesContainer.appendChild(botMessageElement);
+                // 历史消息加载时也添加复制按钮
+                addCopyButtonsToPreTags(botMessageElement);
             });
             // 加载完历史对话后更新当前对话ID（同时存入localStorage）
             setCurrentConversationId(conversationId);
