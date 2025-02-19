@@ -9,6 +9,8 @@ var aiVoiceEnabled = parseInt(DEEPSEEK_VARS.AI_VOICE_ENABLED);
 var deepseek_rest_nonce = DEEPSEEK_VARS.REST_NONCE;
 var restUrl = DEEPSEEK_VARS.REST_URL;
 var adminAjaxUrl = DEEPSEEK_VARS.ADMIN_AJAX_URL;
+var enableKeywordDetection = parseInt(DEEPSEEK_VARS.ENABLE_KEYWORD_DETECTION);
+var keywords = DEEPSEEK_VARS.KEYWORDS.split(',');
 
 // 全局当前对话ID变量
 var currentConversationId = null; 
@@ -53,6 +55,29 @@ document.getElementById('deepseek-chat-input').addEventListener('input', functio
             customPrompts.style.display = 'block';
         }
     }        
+});
+
+// 检测关键词
+function containsForbiddenKeyword(message) {
+    return keywords.some(keyword => message.includes(keyword.trim()));
+}
+
+// 关键词检测事件绑定
+document.addEventListener('DOMContentLoaded', function() {
+    const sendButton = document.getElementById('deepseek-chat-send');
+    const inputField = document.getElementById('deepseek-chat-input');
+    const errorMessage = document.getElementById('keyword-error-message');
+
+    sendButton.addEventListener('click', function(event) {
+        const message = inputField.value.trim();
+
+        if (enableKeywordDetection && containsForbiddenKeyword(message)) {
+            errorMessage.style.display = 'block';
+            event.preventDefault(); // 阻止发送
+        } else {
+            errorMessage.style.display = 'none';
+        }
+    });
 });
 
 // 发送消息
@@ -452,7 +477,7 @@ function addCopyButtonsToPreTags(container) {
     const preTags = container.querySelectorAll('pre');
     preTags.forEach(pre => {
         const copyButton = document.createElement('button');
-        copyButton.textContent = '复制';
+        copyButton.textContent = '一键复制';
         copyButton.classList.add('pre-copy-button');
         copyButton.addEventListener('click', () => {
             const textToCopy = pre.textContent;

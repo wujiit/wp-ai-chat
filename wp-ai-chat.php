@@ -1,9 +1,9 @@
 <?php
 /*
 Plugin Name: 小半WordPress ai助手
-Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结，可对接deepseek、通义千问、豆包等模型。
+Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 2.9
+Version: 3.0
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -163,7 +163,9 @@ function deepseek_register_settings() {
     register_setting('deepseek_chat_options_group', 'enable_ai_voice_reading'); // AI对话语音朗读
     register_setting('deepseek_chat_options_group', 'deepseek_custom_prompts'); // 自定义提示词
     register_setting('deepseek_chat_options_group', 'ai_tutorial_title'); // AI使用教程标题
-    register_setting('deepseek_chat_options_group', 'ai_tutorial_url');   // AI使用教程链接    
+    register_setting('deepseek_chat_options_group', 'ai_tutorial_url');   // AI使用教程链接
+    register_setting('deepseek_chat_options_group', 'enable_keyword_detection'); // 启用关键词检测
+    register_setting('deepseek_chat_options_group', 'keyword_list'); // 违规关键词列表    
 
     add_settings_section('deepseek_main_section', '基础设置', null, 'deepseek-chat');
     // DeepSeek配置项
@@ -211,9 +213,28 @@ function deepseek_register_settings() {
     // AI使用教程标题
     add_settings_field('ai_tutorial_title', '提示词教程标题', 'ai_tutorial_title_callback', 'deepseek-chat', 'deepseek_main_section');
     // AI使用教程链接 
-    add_settings_field('ai_tutorial_url', '提示词教程链接', 'ai_tutorial_url_callback', 'deepseek-chat', 'deepseek_main_section');    
+    add_settings_field('ai_tutorial_url', '提示词教程链接', 'ai_tutorial_url_callback', 'deepseek-chat', 'deepseek_main_section');
+    // 启用关键词检测
+    add_settings_field('enable_keyword_detection', '启用关键词检测', 'enable_keyword_detection_callback', 'deepseek-chat', 'deepseek_main_section');
+    // 违规关键词
+    add_settings_field('keyword_list', '违规关键词列表', 'keyword_list_callback', 'deepseek-chat', 'deepseek_main_section');
+    
 }
 add_action('admin_init', 'deepseek_register_settings');
+
+
+// 启用关键词检测的回调函数
+function enable_keyword_detection_callback() {
+    $enabled = get_option('enable_keyword_detection', '0');
+    echo '<input type="checkbox" name="enable_keyword_detection" value="1" ' . checked(1, $enabled, false) . ' />';
+}
+
+// 关键词列表回调函数
+function keyword_list_callback() {
+    $keywords = get_option('keyword_list', '');
+    echo '<textarea name="keyword_list" rows="5" cols="60" placeholder="请输入逗号分隔的关键词">' . esc_textarea($keywords) . '</textarea>';
+    echo '<p class="description">请输入需要检测的关键词，多个关键词用英文逗号分隔。</p>';
+}
 
 // AI使用教程标题回调函数
 function ai_tutorial_title_callback() {
@@ -626,7 +647,7 @@ function deepseek_enqueue_assets() {
             // 加载marked.min.js
             wp_enqueue_script('marked-js', plugin_dir_url(__FILE__) . 'marked.min.js', array(), null, true);
 
-            // 加载deepseek-chat.js
+            // 加载wpai-chat.js
             wp_enqueue_script('deepseek-chat-script', plugin_dir_url(__FILE__) . 'wpai-chat.js', array('marked-js'), null, true);
 
             // 传递PHP变量到JavaScript
@@ -637,7 +658,9 @@ function deepseek_enqueue_assets() {
                     'AI_VOICE_ENABLED' => get_option('enable_ai_voice_reading', '0'),
                     'REST_NONCE' => wp_create_nonce('wp_rest'),
                     'REST_URL' => esc_url(rest_url('deepseek/v1/send-message')),
-                    'ADMIN_AJAX_URL' => admin_url('admin-ajax.php')
+                    'ADMIN_AJAX_URL' => admin_url('admin-ajax.php'),
+                    'ENABLE_KEYWORD_DETECTION' => get_option('enable_keyword_detection', '0'),
+                    'KEYWORDS' => get_option('keyword_list', '')
                 )
             );
         }
@@ -687,7 +710,6 @@ function deepseek_chat_shortcode() {
             <?php endif; ?>
         </ul>
     </div>
-
     <!-- 主对话框 -->
     <div id="deepseek-chat-main">
         <!-- 消息框 -->
@@ -709,14 +731,16 @@ function deepseek_chat_shortcode() {
             }
             ?>            
         </div>
-
         <!-- 输入框和发送按钮 -->
         <div id="deepseek-chat-input-container">
             <textarea id="deepseek-chat-input" placeholder="输入你的消息..." rows="4"></textarea>
             <button id="deepseek-chat-send">发送</button>
         </div>
+        <div id="keyword-error-message" style="color: red; display: none; margin-top: 5px; margin-left: 10px;">
+            内容包含违规关键词，小助手无法正常处理，请刷新网页修改之后再试。
+        </div>        
             <?php
-            // 显示AI使用教程链接
+            // 显示使用教程链接
             $tutorial_title = get_option('ai_tutorial_title', '');
             $tutorial_url = get_option('ai_tutorial_url', '');
             if (!empty($tutorial_title) && !empty($tutorial_url)) {
@@ -743,6 +767,22 @@ function deepseek_send_message_rest( WP_REST_Request $request ) {
     $conversation_id = $request->get_param('conversation_id') ? intval($request->get_param('conversation_id')) : null;
     $user_id = get_current_user_id();
     $interface_choice = get_option('chat_interface_choice', 'deepseek');
+
+    // 获取用户输入的消息
+    $message = sanitize_text_field( $request->get_param('message') );
+    // 如果启用了关键词检测，进行关键词检查
+    $enable_keyword_detection = get_option('enable_keyword_detection', '0');
+    if ($enable_keyword_detection) {
+        $keywords = get_option('keyword_list', '');
+        $keywords = array_map('trim', explode(',', $keywords));
+        foreach ($keywords as $keyword) {
+            if (stripos($message, $keyword) !== false) {
+                return new WP_REST_Response([
+                    'success' => false,
+                ], 400);
+            }
+        }
+    }
 
     // 当消息中包含“请帮我生成一张图片”的提示词时，均走通义千问图像生成接口
     $enable_image   = get_option('qwen_enable_image');
