@@ -148,6 +148,7 @@ function deepseek_register_settings() {
     register_setting('deepseek_chat_options_group', 'qianfan_api_key'); // 千帆 API Key
     register_setting('deepseek_chat_options_group', 'qianfan_model'); // 千帆 模型参数
     // 通义千问文本和图像
+    register_setting('deepseek_chat_options_group', 'qwen_api_key'); // 通义千问 API Key
     register_setting('deepseek_chat_options_group', 'qwen_text_model'); // 通义千问 文本模型
     register_setting('deepseek_chat_options_group', 'qwen_image_model'); // 通义千问 图像模型
     register_setting('deepseek_chat_options_group', 'qwen_enable_image'); // 启用图片生成复选框
