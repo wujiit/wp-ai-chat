@@ -3,7 +3,7 @@
 # 小半WordPress ai助手  
 
 [![License](https://img.shields.io/badge/license-GPL-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.0-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/3.0)
+[![Version](https://img.shields.io/badge/version-3.2-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/3.2)
 [![WordPress](https://img.shields.io/badge/WordPress-6.7-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.0-orange.svg)](https://www.php.net/)
 
