@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 3.2
+Version: 3.3
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -508,7 +508,7 @@ function chat_interface_choice_callback() {
         <option value="doubao" <?php selected($choice, 'doubao'); ?>>豆包AI</option>
         <option value="qwen" <?php selected($choice, 'qwen'); ?>>通义千问</option>
         <option value="qianfan" <?php selected($choice, 'qianfan'); ?>>千帆(文心一言)</option>
-        <option value="hunyuan" <?php selected($choice, 'custom'); ?>>腾讯混元</option>
+        <option value="hunyuan" <?php selected($choice, 'hunyuan'); ?>>腾讯混元</option>
         <option value="custom" <?php selected($choice, 'custom'); ?>>自定义接口</option>
     </select>
     <?php
@@ -891,147 +891,152 @@ function deepseek_send_message_rest( WP_REST_Request $request ) {
             ]);
         }
     }
-        // 文本对话分支（流式返回）
-        switch ($interface_choice) {
-            case 'deepseek':
-                $api_key = get_option('deepseek_api_key');
-                $model = get_option('deepseek_model', 'deepseek-chat');
-                $api_url = 'https://api.deepseek.com/chat/completions';
-                break;
-            case 'doubao':
-                $api_key = get_option('doubao_api_key');
-                $model = get_option('doubao_model');
-                $api_url = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
-                break;
-            case 'hunyuan':
-                $api_key = get_option('hunyuan_api_key');
-                $model = get_option('hunyuan_model');
-                $api_url = 'https://api.hunyuan.cloud.tencent.com/v1/chat/completions';
-                break;                
-            case 'kimi':
-                $api_key = get_option('kimi_api_key');
-                $model = get_option('kimi_model');
-                $api_url = 'https://api.moonshot.cn/v1/chat/completions';
-                break;       
-            case 'openai':
-                $api_key = get_option('openai_api_key');
-                $model = get_option('openai_model');
-                $api_url = 'https://api.openai.com/v1/chat/completions';
-                break;   
-            case 'qianfan':
-                $api_key = get_option('qianfan_api_key');
-                $model = get_option('qianfan_model');
-                $api_url = 'https://qianfan.baidubce.com/v2/chat/completions';
-                break;                                       
-            case 'qwen':
-                $api_key = get_option('qwen_api_key');
-                $model = get_option('qwen_text_model', 'qwen-max');
-                $api_url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
-                break;
-            case 'custom':
-                $api_key = get_option('custom_api_key');
-                $model = get_option('custom_model_params');
-                $api_url = get_option('custom_model_url');
-                if (empty($api_key) || empty($model) || empty($api_url)) {
-                    wp_send_json(['success' => false, 'message' => '自定义模型设置不完整']);
-                }
-                break;                
-            default:
-                wp_send_json(['success' => false, 'message' => '无效的接口选择']);
-        }
-
-        if (empty($api_key)) {
-            wp_send_json(['success' => false, 'message' => 'API Key 未设置']);
-        }
-
-        $messages = [['role' => 'system', 'content' => 'You are a helpful assistant.']];
-        if ($conversation_id) {
-            $history = $wpdb->get_results($wpdb->prepare(
-                "SELECT message, response FROM $table_name 
-                WHERE conversation_id = %d 
-                ORDER BY id ASC",
-                $conversation_id
-            ));
-            
-            foreach ($history as $item) {
-                $messages[] = ['role' => 'user', 'content' => $item->message];
-                $messages[] = ['role' => 'assistant', 'content' => $item->response];
+    // 文本对话分支（流式返回）
+    switch ($interface_choice) {
+        case 'deepseek':
+            $api_key = get_option('deepseek_api_key');
+            $model = get_option('deepseek_model', 'deepseek-chat');
+            $api_url = 'https://api.deepseek.com/chat/completions';
+            break;
+        case 'doubao':
+            $api_key = get_option('doubao_api_key');
+            $model = get_option('doubao_model');
+            $api_url = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
+            break;
+        case 'hunyuan':
+            $api_key = get_option('hunyuan_api_key');
+            $model = get_option('hunyuan_model');
+            $api_url = 'https://api.hunyuan.cloud.tencent.com/v1/chat/completions';
+            break;                
+        case 'kimi':
+            $api_key = get_option('kimi_api_key');
+            $model = get_option('kimi_model');
+            $api_url = 'https://api.moonshot.cn/v1/chat/completions';
+            break;       
+        case 'openai':
+            $api_key = get_option('openai_api_key');
+            $model = get_option('openai_model');
+            $api_url = 'https://api.openai.com/v1/chat/completions';
+            break;   
+        case 'qianfan':
+            $api_key = get_option('qianfan_api_key');
+            $model = get_option('qianfan_model');
+            $api_url = 'https://qianfan.baidubce.com/v2/chat/completions';
+            break;                                       
+        case 'qwen':
+            $api_key = get_option('qwen_api_key');
+            $model = get_option('qwen_text_model', 'qwen-max');
+            $api_url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+            break;
+        case 'custom':
+            $api_key = get_option('custom_api_key');
+            $model = get_option('custom_model_params');
+            $api_url = get_option('custom_model_url');
+            if (empty($api_key) || empty($model) || empty($api_url)) {
+                wp_send_json(['success' => false, 'message' => '自定义模型设置不完整']);
             }
-        }
-        $messages[] = ['role' => 'user', 'content' => $message];
-
-        $data = [
-            'model' => $model,
-            'messages' => $messages,
-            'stream' => true
-        ];
-
-        // 清空缓冲区，设置流式响应头
-        if (ob_get_length()) { ob_end_clean(); }
-        header('Content-Type: text/plain');
-        header('Cache-Control: no-cache');
-        header('Transfer-Encoding: chunked');
-        header('Connection: keep-alive');
-
-        $fullReply = '';
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $api_url);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Content-Type: application/json',
-            'Authorization: Bearer ' . $api_key
-        ]);
-        curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        // 利用write callback实现流式输出，并累计完整回复
-        curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($ch, $chunk) use (&$fullReply) {
-            echo $chunk;
-            flush();
-            $fullReply .= $chunk;
-            return strlen($chunk);
-        });
-        curl_setopt($ch, CURLOPT_TIMEOUT, 0);
-        curl_exec($ch);
-        curl_close($ch);
-
-        // 流式输出结束后，解析SSE数据提取有效内容并保存到数据库
-        $lines = explode("\n", $fullReply);
-        $processedReply = '';
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if (strpos($line, 'data:') === 0) {
-                $dataPart = trim(substr($line, 5));
-                if ($dataPart === '[DONE]') {
-                    continue;
-                }
-                $jsonData = json_decode($dataPart, true);
-                if ($jsonData && isset($jsonData['choices'][0]['delta']['content'])) {
-                    $processedReply .= $jsonData['choices'][0]['delta']['content'];
-                }
-            }
-        }
-        $reply = $processedReply;
-        $wpdb->insert($table_name, [
-            'user_id'             => $user_id,
-            'conversation_id'     => $conversation_id ?: 0,
-            'conversation_title'  => $conversation_id ? '' : $message,
-            'message'             => $message,
-            'response'            => $reply
-        ]);
-        if (!$conversation_id) {
-            $conversation_id = $wpdb->insert_id;
-            $wpdb->update($table_name, 
-                ['conversation_id' => $conversation_id], 
-                ['id' => $conversation_id]
-            );
-        }
-
-        // 输出一条SSE事件，将conversation_id返回给前端
-        echo "\n";
-        echo "data: " . json_encode(['conversation_id' => $conversation_id]) . "\n\n";
-        flush();
-
-        exit();
+            break;                
+        default:
+            wp_send_json(['success' => false, 'message' => '无效的接口选择']);
     }
+
+    if (empty($api_key)) {
+        wp_send_json(['success' => false, 'message' => 'API Key 未设置']);
+    }
+
+    $messages = [['role' => 'system', 'content' => 'You are a helpful assistant.']];
+    if ($conversation_id) {
+        $history = $wpdb->get_results($wpdb->prepare(
+            "SELECT message, response FROM $table_name 
+            WHERE conversation_id = %d 
+            ORDER BY id ASC",
+            $conversation_id
+        ));
+        
+        foreach ($history as $item) {
+            $messages[] = ['role' => 'user', 'content' => $item->message];
+            $messages[] = ['role' => 'assistant', 'content' => $item->response];
+        }
+    }
+    $messages[] = ['role' => 'user', 'content' => $message];
+
+    $data = [
+        'model' => $model,
+        'messages' => $messages,
+        'stream' => true
+    ];
+
+    // 清空缓冲区，设置流式响应头
+    if (ob_get_length()) { ob_end_clean(); }
+    while (ob_get_level()) { ob_end_flush(); }
+    ini_set('output_buffering', 'off');
+    ini_set('zlib.output_compression', false);
+    header('Content-Type: text/event-stream');
+    header('Cache-Control: no-cache');
+    header('X-Accel-Buffering: no');
+    header('Connection: keep-alive');
+
+    $fullReply = '';
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $api_url);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json',
+        'Authorization: Bearer ' . $api_key
+    ]);
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+    // 利用write callback实现流式输出
+    curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($ch, $chunk) use (&$fullReply) {
+        echo $chunk;
+        ob_flush();
+        flush();
+        $fullReply .= $chunk;
+        return strlen($chunk);
+    });
+    curl_setopt($ch, CURLOPT_TIMEOUT, 0);
+    curl_exec($ch);
+    curl_close($ch);
+
+    // 流式输出结束后，解析SSE数据提取有效内容并保存到数据库
+    $lines = explode("\n", $fullReply);
+    $processedReply = '';
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if (strpos($line, 'data:') === 0) {
+            $dataPart = trim(substr($line, 5));
+            if ($dataPart === '[DONE]') {
+                continue;
+            }
+            $jsonData = json_decode($dataPart, true);
+            if ($jsonData && isset($jsonData['choices'][0]['delta']['content'])) {
+                $processedReply .= $jsonData['choices'][0]['delta']['content'];
+            }
+        }
+    }
+    $reply = $processedReply;
+    $wpdb->insert($table_name, [
+        'user_id'             => $user_id,
+        'conversation_id'     => $conversation_id ?: 0,
+        'conversation_title'  => $conversation_id ? '' : $message,
+        'message'             => $message,
+        'response'            => $reply
+    ]);
+    if (!$conversation_id) {
+        $conversation_id = $wpdb->insert_id;
+        $wpdb->update($table_name, 
+            ['conversation_id' => $conversation_id], 
+            ['id' => $conversation_id]
+        );
+    }
+
+    // 输出一条SSE事件，将conversation_id返回给前端
+    echo "\n";
+    echo "data: " . json_encode(['conversation_id' => $conversation_id]) . "\n\n";
+    ob_flush();
+    flush();
+
+    exit();
+}
 
 
 add_action('rest_api_init', function () {

@@ -262,12 +262,13 @@ document.getElementById('deepseek-chat-send').addEventListener('click', function
                             }
                             // 流结束后，将Markdown转换为HTML显示
                             botMessageContainer.innerHTML = convertMarkdownToHTML(botReply);
+                            // 添加复制按钮到新生成的pre标签
+                            addCopyButtonsToPreTags(botMessageContainer);
                             if (aiVoiceEnabled) {
                                 var playIcon = document.createElement('span');
                                 playIcon.classList.add('ai-tts-play');
                                 playIcon.innerHTML = '&#128266;';
                                 playIcon.style.marginLeft = '10px';
-
                                 playIcon.addEventListener('click', function() {
                                     var audioElem = document.getElementById('ai-tts-audio');
                                     if (!audioElem) {
@@ -346,8 +347,7 @@ document.getElementById('deepseek-chat-send').addEventListener('click', function
                                         messageSpan.textContent = '请求错误，请重试';
                                         messageSpan.style.color = 'red';
                                     });
-                                });
-
+                                });                                
                                 botMessageContainer.appendChild(playIcon);
                             }
                             // 清空输入框
