@@ -5,6 +5,43 @@ body {
     padding: 0;
     color: #333;
 }
+#deepseek-tutorial-link {
+    margin-top: 10px;
+    margin-bottom: 20px;
+    text-align: center;
+    display: inline-block;
+    margin-left: auto;
+    margin-right: auto;
+    background-image: linear-gradient(to right, #6a11cb 0%, #2575fc 100%);
+    border: none;
+    border-radius: 8px;
+    padding: 12px 20px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+}
+
+#deepseek-tutorial-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+                0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    background-image: linear-gradient(to left, #6a11cb 0%, #2575fc 100%);
+}
+
+#deepseek-tutorial-link a {
+    color: #ffffff;
+    text-decoration: none;
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0.025em;
+    transition: color 0.3s ease;
+}
+
+#deepseek-tutorial-link a:hover {
+    color: #f3f4f6;
+    text-decoration: none;
+}
 
 /* 容器样式 */
 #deepseek-chat-container {
@@ -182,7 +219,6 @@ body {
     color: #ffffff !important;
 }
 
-
 /* 对话框里面的图片 */
 .message-bubble.bot img {
     max-width: 100%;
@@ -280,13 +316,10 @@ body {
 
 /* 自定义提示词板块样式 */
 #deepseek-custom-prompts {
-    /* background: linear-gradient(135deg, #f0f4f8, #d9e2ec); */
-    /* border: 1px solid #bcccdc; */
     padding: 15px;
     margin-top: 15px;
     border-radius: 8px;
     text-align: center;
-    /* box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); */
 }
 
 #deepseek-custom-prompts .deepseek-prompt {
@@ -307,7 +340,7 @@ body {
     transform: translateY(-2px);
 }
 
- /* ai对话框语音朗读按钮 */
+/* ai对话框语音朗读按钮 */
 .ai-tts-play {
     display: inline-block;
     padding: 5px 10px;
@@ -354,47 +387,10 @@ body {
     transform: translateX(-50%) scale(0.98);
 }
 
- /* 使用教程按钮 */
-#deepseek-tutorial-link {
-    margin-top: 10px;
-    margin-bottom: 10px;
-    text-align: center;
-    display: inline-block;
-    margin-left: auto;
-    margin-right: auto;
-    background-image: linear-gradient(to right, #6a11cb 0%, #2575fc 100%);
-    border: none;
-    border-radius: 8px;
-    padding: 12px 20px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    transition: all 0.3s ease;
-}
-
-#deepseek-tutorial-link:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    background-image: linear-gradient(to left, #6a11cb 0%, #2575fc 100%);
-}
-
-#deepseek-tutorial-link a {
-    color: #ffffff;
-    text-decoration: none;
-    font-family: 'Inter', sans-serif;
-    font-size: 16px;
-    font-weight: 500;
-    letter-spacing: 0.025em;
-    transition: color 0.3s ease;
-}
-
-#deepseek-tutorial-link a:hover {
-    color: #f3f4f6;
-    text-decoration: none;
-}
-
 /* 响应式优化 */
 @media (max-width: 768px) {
     #deepseek-chat-container {
-        flex-direction: column-reverse; /* 历史对话框放在下面 */
+        flex-direction: column-reverse; /* 历史对话框放在下方 */
         height: 100vh;
         margin: 0;
         border-radius: 0;
@@ -403,18 +399,25 @@ body {
     #deepseek-chat-history {
         width: 100%;
         border-right: none;
-        border-top: 1px solid #e0e0e0; /* 替换边框位置 */
+        border-top: 1px solid #e0e0e0;
+        max-height: 40vh; /* 限制历史对话框高度 */
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     #deepseek-chat-main {
         flex: 1;
         display: flex;
         flex-direction: column;
+        min-height: 0; /* 允许内部滚动 */
     }
 
     #deepseek-chat-messages {
         flex: 1;
         padding: 15px;
+        min-height: 0; /* Flex元素溢出问题 */
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     #deepseek-chat-input-container {
