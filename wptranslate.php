@@ -102,12 +102,12 @@ function wpatai_settings_page() {
                     <th scope="row">启用翻译服务</th>
                     <td>
                         <input type="checkbox" name="wpatai_settings[enable_translation]" value="1" <?php checked( 1, isset( $options['enable_translation'] ) ? $options['enable_translation'] : 0 ); ?> />
-                        <label for="enable_translation">启用文章内容 AI 翻译功能</label>
+                        <label for="enable_translation">启用文章内容AI翻译功能</label>
                     </td>
                 </tr>
                 <!-- 选择调用的 API 接口 -->
                 <tr valign="top">
-                    <th scope="row">选择 API 接口</th>
+                    <th scope="row">选择API接口</th>
                     <td>
                         <?php $selected_api = isset( $options['selected_api'] ) ? $options['selected_api'] : 'deepseek'; ?>
                         <select name="wpatai_settings[selected_api]">
@@ -240,6 +240,14 @@ function wpatai_settings_page() {
                         <p class="description">请输入百度云语音合成的音库值（per），默认值为 0。</p>
                     </td>
                 </tr>
+                <!-- 排除的文章不加载翻译和语音 -->
+                <tr valign="top">
+                    <th scope="row">排除文章的ID</th>
+                    <td>
+                        <input type="text" name="wpatai_settings[exclude_post_ids]" value="<?php echo isset( $options['exclude_post_ids'] ) ? esc_attr( $options['exclude_post_ids'] ) : ''; ?>" size="50" />
+                        <p class="description">请输入要排除的文章 ID，多个 ID 用英文逗号分隔，排除的文章不加载翻译和语音。</p>
+                    </td>
+                </tr>                
             </table>
             <?php submit_button(); ?>
         </form>
@@ -257,6 +265,13 @@ function wpatai_append_control_bar( $content ) {
     }
     $options = get_option( 'wpatai_settings' );
     $post_id = get_the_ID();
+
+    // 检查是否在排除列表中
+    $exclude_post_ids = isset( $options['exclude_post_ids'] ) ? explode( ',', $options['exclude_post_ids'] ) : [];
+    $exclude_post_ids = array_map( 'trim', $exclude_post_ids );
+    if ( in_array( strval( $post_id ), $exclude_post_ids ) ) {
+        return $content;
+    }
 
     // 若翻译与朗读均未启用，则不添加
     if ( empty( $options['enable_translation'] ) && empty( $options['enable_tts'] ) ) {
@@ -300,11 +315,20 @@ function wpatai_enqueue_assets() {
     }
 
     $options = get_option( 'wpatai_settings' );
+    // 获取当前文章ID
+    $post_id = get_the_ID();
+    $exclude_post_ids = isset( $options['exclude_post_ids'] ) ? explode( ',', $options['exclude_post_ids'] ) : [];
+    $exclude_post_ids = array_map( 'trim', $exclude_post_ids );
+    // 检查当前文章ID是否在排除列表中
+    if ( in_array( strval( $post_id ), $exclude_post_ids ) ) {
+        return;
+    }
+
     if ( empty( $options['enable_translation'] ) && empty( $options['enable_tts'] ) ) {
         return;
     }
 
-    // 输出内联 CSS
+    // 输出内联CSS
     add_action('wp_head', function() {
         ?>
         <style>
@@ -389,7 +413,7 @@ add_action( 'wp_ajax_nopriv_wpatai_translate', 'wpatai_handle_translation' );
 
 // 处理语音朗读请求
 function wpatai_handle_tts() {
-    set_time_limit(0); // 取消 PHP 执行时间限制
+    set_time_limit(0); // 取消PHP执行时间限制
     check_ajax_referer( 'wpatai_tts_nonce', 'nonce' );
     
     $post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
@@ -466,7 +490,7 @@ function wpatai_translate_content( $html, $target_language, $translation_type, $
     $doc->loadHTML('<?xml encoding="UTF-8"><div id="wpatai_wrapper">' . $html . '</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
     $xpath = new DOMXPath($doc);
     
-    // 查询所有非空文本节点（排除 code、pre、script、style 标签内的内容）
+    // 查询所有非空文本节点（排除code、pre、script、style标签内的内容）
     $textNodes = $xpath->query('//text()[normalize-space(.) and not(ancestor::code) and not(ancestor::pre) and not(ancestor::script) and not(ancestor::style)]');
     
     $index = 0;
@@ -540,7 +564,7 @@ function wpatai_call_api( $prompt, $selected_api, $options ) {
             $args = array(
                 'body'    => json_encode( $payload ),
                 'headers' => $headers,
-                'timeout' => 30,
+                'timeout' => 60,
             );
             $response = wp_remote_post( $endpoint, $args );
             if ( is_wp_error( $response ) ) {
@@ -583,7 +607,7 @@ function wpatai_call_api( $prompt, $selected_api, $options ) {
             $args = array(
                 'body'    => json_encode( $payload ),
                 'headers' => $headers,
-                'timeout' => 30,
+                'timeout' => 60,
             );
             $response = wp_remote_post( $endpoint, $args );
             if ( is_wp_error( $response ) ) {
@@ -626,7 +650,7 @@ function wpatai_call_api( $prompt, $selected_api, $options ) {
             $args = array(
                 'body'    => json_encode( $payload ),
                 'headers' => $headers,
-                'timeout' => 30,
+                'timeout' => 60,
             );
             $response = wp_remote_post( $endpoint, $args );
             if ( is_wp_error( $response ) ) {
@@ -717,7 +741,7 @@ function wpatai_call_tts_api( $text, $secret_id, $secret_key, $voice_type = 0 ) 
     $args = array(
         'body'    => $payload,
         'headers' => $headers,
-        'timeout' => 30,
+        'timeout' => 60,
     );
     
     $response = wp_remote_post( $endpoint, $args );
@@ -770,7 +794,7 @@ function wpatai_call_baidu_tts_api( $text, $api_key, $secret_key, $per = 0 ) {
     $url = "https://tsn.baidu.com/text2audio";
     $args = array(
         'body'        => http_build_query($params),
-        'timeout'     => 30,
+        'timeout'     => 60,
         'sslverify'   => false,
         'headers'     => array(
             'Content-Type' => 'application/x-www-form-urlencoded',
@@ -783,7 +807,7 @@ function wpatai_call_baidu_tts_api( $text, $api_key, $secret_key, $per = 0 ) {
         return new WP_Error( 'baidu_tts_request_error', $response->get_error_message() );
     }
     
-    // 百度接口若成功，直接返回音频二进制数据，否则返回 JSON 错误信息
+    // 百度接口若成功，直接返回音频二进制数据，否则返回JSON错误信息
     $content_type = wp_remote_retrieve_header( $response, 'content-type' );
     $body = wp_remote_retrieve_body( $response );
     if ( strpos($content_type, 'application/json') !== false ) {
@@ -810,7 +834,7 @@ function wpatai_get_baidu_access_token( $api_key, $secret_key ) {
     
     $args = array(
         'body'      => http_build_query($post_data),
-        'timeout'   => 30,
+        'timeout'   => 60,
         'sslverify' => false,
     );
     
