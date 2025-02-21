@@ -3,7 +3,7 @@
 # 小半WordPress ai助手  
 
 [![License](https://img.shields.io/badge/license-GPL-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.3-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/3.3)
+[![Version](https://img.shields.io/badge/version-3.4-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/3.4)
 [![WordPress](https://img.shields.io/badge/WordPress-6.7-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.0-orange.svg)](https://www.php.net/)
 
@@ -45,7 +45,8 @@
 25.自定义提示词教程  
 26.Markdown内容板块会自动加载复制按钮  
 27.支持违规关键词检测  
-28.文章翻译和语音播放可以排除指定文章
+28.文章翻译和语音播放可以排除指定文章 
+29.支持通义千问联网搜索
 
 
 ## 📥 安装
@@ -77,5 +78,5 @@ php版本：php 8.0
 
 
 
-![WordPressai.png](https://i.miji.bid/2025/02/14/2a5c7bcd11a8433c7311638b8a6b8f76.jpeg)
+![4131f8aa8b30d96706bc74514b5bb5d4.jpeg](https://i.miji.bid/2025/02/21/4131f8aa8b30d96706bc74514b5bb5d4.jpeg)
 ![a979fdb418172e3cbb8241d211e5fff5.jpeg](https://i.miji.bid/2025/02/17/a979fdb418172e3cbb8241d211e5fff5.jpeg)
