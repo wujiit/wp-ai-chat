@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 3.3.1
+Version: 3.4
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -154,6 +154,8 @@ function deepseek_register_settings() {
     register_setting('deepseek_chat_options_group', 'qwen_text_model'); // 通义千问 文本模型
     register_setting('deepseek_chat_options_group', 'qwen_image_model'); // 通义千问 图像模型
     register_setting('deepseek_chat_options_group', 'qwen_enable_image'); // 通义千问图片生成复选框
+    register_setting('deepseek_chat_options_group', 'qwen_enable_search'); // 通义千问联网搜索
+
     // 自定义模型设置
     register_setting('deepseek_chat_options_group', 'custom_api_key');       // 自定义模型 API Key
     register_setting('deepseek_chat_options_group', 'custom_model_params');    // 自定义模型参数
@@ -201,6 +203,7 @@ function deepseek_register_settings() {
     add_settings_field('qwen_api_key', '通义千问 API Key', 'qwen_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
     add_settings_field('qwen_text_model', '通义千问 文本模型', 'qwen_text_model_callback', 'deepseek-chat', 'deepseek_main_section');
     add_settings_field('qwen_image_model', '通义千问 图像模型', 'qwen_image_model_callback', 'deepseek-chat', 'deepseek_main_section');
+    add_settings_field('qwen_enable_search', '启用通义千问联网搜索', 'qwen_enable_search_callback', 'deepseek-chat', 'deepseek_main_section');
 
     // 自定义模型配置项
     add_settings_field('custom_api_key', '自定义模型 API Key', 'custom_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
@@ -407,6 +410,11 @@ function qwen_enable_image_callback() {
     $enabled = get_option('qwen_enable_image', 0);
     $checked = $enabled ? 'checked' : '';
     echo '<input type="checkbox" name="qwen_enable_image" value="1" ' . $checked . ' /> 需要设置通义千问图像模型';
+}
+function qwen_enable_search_callback() {
+    $enabled = get_option('qwen_enable_search', 0);
+    $checked = $enabled ? 'checked' : '';
+    echo '<input type="checkbox" name="qwen_enable_search" value="1" ' . $checked . ' /> 仅通义千问部分模型支持';
 }
 
 // 自定义模型相关回调
@@ -782,20 +790,29 @@ function deepseek_chat_shortcode() {
         </div>
         <div id="keyword-error-message" style="color: red; display: none; margin-top: 5px; margin-left: 10px;">
             内容包含违规关键词，小助手无法正常处理，请刷新网页修改之后再试。
-        </div>        
-            <?php
-            // 显示使用教程链接
-            $tutorial_title = get_option('ai_tutorial_title', '');
-            $tutorial_url = get_option('ai_tutorial_url', '');
-            if (!empty($tutorial_title) && !empty($tutorial_url)) {
-                echo '<div id="deepseek-tutorial-link">';
-                echo '<a href="' . esc_url($tutorial_url) . '" target="_blank">' . esc_html($tutorial_title) . '</a>';
-                echo '</div>';
-            }
-        ?>         
-    </div>
-</div>
-<div id="bottom-description" style="margin-top: 5px; text-align: center;">内容由Ai自动生成，不代表本站观点。</div>
+        </div>
+        <div id="deepseek-options-bar">
+                        <?php if (get_option('qwen_enable_search') && get_option('chat_interface_choice') === 'qwen'): ?>
+                            <div class="deepseek-option-item deepseek-search-toggle">
+                                <label class="switch">
+                                    <input type="checkbox" id="enable-search">
+                                    <span class="slider round"></span>
+                                </label>
+                                <span>联网搜索</span>
+                            </div>
+                        <?php endif; ?>
+                        <?php
+                        $tutorial_title = get_option('ai_tutorial_title', '');
+                        $tutorial_url = get_option('ai_tutorial_url', '');
+                        if (!empty($tutorial_title) && !empty($tutorial_url)): ?>
+                            <div class="deepseek-option-item deepseek-tutorial-link">
+                                <a href="<?php echo esc_url($tutorial_url); ?>" target="_blank"><?php echo esc_html($tutorial_title); ?></a>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+            <div id="bottom-description" style="margin-top: 5px; text-align: center;">内容由Ai自动生成，不代表本站观点。</div>        
         <?php
     }
     return ob_get_clean();
@@ -812,6 +829,7 @@ function deepseek_send_message_rest( WP_REST_Request $request ) {
     $conversation_id = $request->get_param('conversation_id') ? intval($request->get_param('conversation_id')) : null;
     $user_id = get_current_user_id();
     $interface_choice = get_option('chat_interface_choice', 'deepseek');
+    $enable_search = filter_var($request->get_param('enable_search'), FILTER_VALIDATE_BOOLEAN); // 获取前端开关状态
 
     // 获取用户输入的消息
     $message = sanitize_text_field( $request->get_param('message') );
@@ -964,7 +982,8 @@ function deepseek_send_message_rest( WP_REST_Request $request ) {
     $data = [
         'model' => $model,
         'messages' => $messages,
-        'stream' => true
+        'stream' => true,
+        'enable_search' => $interface_choice === 'qwen' && get_option('qwen_enable_search') && $enable_search // 联网搜索设置
     ];
 
     // 清空缓冲区，设置流式响应头

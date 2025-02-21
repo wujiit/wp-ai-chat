@@ -38,6 +38,22 @@ window.addEventListener('load', function() {
     }
 });
 
+// 页面加载时恢复滑动开关状态
+window.addEventListener('load', function() {
+    var storedId = localStorage.getItem('currentConversationId');
+    if (storedId) {
+        setCurrentConversationId(storedId);
+        loadChatLog(storedId);
+    }
+
+    // 恢复联网搜索开关状态
+    var enableSearchSwitch = document.getElementById('enable-search');
+    if (enableSearchSwitch) {
+        var storedSearchState = localStorage.getItem('enableSearchState');
+        enableSearchSwitch.checked = storedSearchState === 'true';
+    }
+});
+
 // 默认提示    
 document.getElementById('deepseek-chat-input').addEventListener('input', function() {
     var prompt = document.getElementById('chatbot-prompt');
@@ -98,6 +114,13 @@ document.getElementById('deepseek-chat-send').addEventListener('click', function
         thinkingMessage.innerHTML = '小助手正在思考中...';
         document.getElementById('deepseek-chat-messages').appendChild(thinkingMessage);
 
+        // 获取联网搜索开关状态并保存到localStorage
+        var enableSearchSwitch = document.getElementById('enable-search');
+        var enableSearch = enableSearchSwitch ? enableSearchSwitch.checked : false;
+        if (enableSearchSwitch) {
+            localStorage.setItem('enableSearchState', enableSearch);
+        }
+
         // 使用REST API接口，传输JSON数据，并附加nonce进行权限验证
         fetch(restUrl, {
             method: 'POST',
@@ -107,7 +130,8 @@ document.getElementById('deepseek-chat-send').addEventListener('click', function
             },
             body: JSON.stringify({
                 message: message,
-                conversation_id: currentConversationId
+                conversation_id: currentConversationId,
+                enable_search: enableSearch
             })
         })
         .then(response => {
@@ -376,6 +400,13 @@ document.getElementById('deepseek-chat-send').addEventListener('click', function
                 errorMsg.innerHTML = '网络错误，请稍后重试';
             }
         });
+    }
+});
+
+// 如果需要，可以添加开关变化时的即时保存
+document.addEventListener('change', function(event) {
+    if (event.target.id === 'enable-search') {
+        localStorage.setItem('enableSearchState', event.target.checked);
     }
 });
 

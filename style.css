@@ -350,43 +350,105 @@ body {
     transform: translateX(-50%) scale(0.98);
 }
 
-/* 教程链接 */
-#deepseek-tutorial-link {
-    margin-top: 10px;
-    margin-bottom: 20px;
-    text-align: center;
-    display: inline-block;
-    margin-left: auto;
-    margin-right: auto;
-    background-image: linear-gradient(to right, #6a11cb 0%, #2575fc 100%);
-    border: none;
+/* 底部选项栏容器样式 */
+#deepseek-options-bar {
+    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 15px;
+    padding: 8px 0;
+    flex-wrap: wrap; /* 防止小屏幕溢出 */
+}
+
+/* 单个选项项通用样式 */
+.deepseek-option-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 10px;
+    padding: 6px 12px;
+    background: linear-gradient(90deg, #ffffff, #f9fbfd);
+    border: 1px solid #e0e0e0;
     border-radius: 8px;
-    padding: 12px 20px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
-                0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.3s ease, transform 0.2s ease;
 }
 
-#deepseek-tutorial-link:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
-                0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    background-image: linear-gradient(to left, #6a11cb 0%, #2575fc 100%);
+.deepseek-option-item:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
 }
 
-#deepseek-tutorial-link a {
-    color: #ffffff;
-    text-decoration: none;
-    font-family: 'Inter', sans-serif;
-    font-size: 16px;
+/* 联网搜索开关样式 */
+.deepseek-search-toggle .switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 20px;
+}
+
+.deepseek-search-toggle .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.deepseek-search-toggle .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #e0e0e0;
+    transition: background-color 0.4s ease;
+    border-radius: 20px;
+}
+
+.deepseek-search-toggle .slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+    background-color: #fff;
+    transition: transform 0.4s ease;
+    border-radius: 50%;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.deepseek-search-toggle input:checked + .slider {
+    background-color: #4caf50;
+}
+
+.deepseek-search-toggle input:checked + .slider:before {
+    transform: translateX(20px);
+}
+
+.deepseek-search-toggle span {
+    font-size: 13px;
     font-weight: 500;
+    color: #333;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 0.025em;
+}
+
+/* 教程链接样式 */
+.deepseek-tutorial-link a {
+    font-size: 13px;
+    font-weight: 500;
+    color: #0073aa;
+    text-decoration: none !important;
+    font-family: 'Inter', sans-serif;
     letter-spacing: 0.025em;
     transition: color 0.3s ease;
 }
 
-#deepseek-tutorial-link a:hover {
-    color: #f3f4f6;
-    text-decoration: none;
+.deepseek-tutorial-link a:hover {
+    color: #005177;
+    text-decoration: none !important;
 }
 
 /* 响应式优化 */
@@ -394,6 +456,7 @@ body {
     #deepseek-chat-container {
         flex-direction: column-reverse; /* 历史对话框放在下方 */
         height: 100vh;
+        max-width: 100%;
         margin: 0;
         border-radius: 0;
     }
@@ -425,4 +488,34 @@ body {
     #deepseek-chat-input-container {
         padding: 10px;
     }
+
+    #deepseek-options-bar {
+        gap: 10px;
+        padding: 6px 0;
+    }
+
+    .deepseek-option-item {
+        padding: 5px 10px;
+    }
+
+    .deepseek-search-toggle .switch {
+        width: 36px;
+        height: 18px;
+    }
+
+    .deepseek-search-toggle .slider:before {
+        height: 12px;
+        width: 12px;
+        left: 3px;
+        bottom: 3px;
+    }
+
+    .deepseek-search-toggle input:checked + .slider:before {
+        transform: translateX(18px);
+    }
+
+    .deepseek-search-toggle span,
+    .deepseek-tutorial-link a {
+        font-size: 12px;
+    }    
 }
