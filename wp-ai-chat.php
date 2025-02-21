@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 3.3
+Version: 3.3.1
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -692,7 +692,7 @@ function deepseek_enqueue_assets() {
             wp_enqueue_script('marked-js', plugin_dir_url(__FILE__) . 'marked.min.js', array(), null, true);
 
             // 加载wpai-chat.js
-            wp_enqueue_script('deepseek-chat-script', plugin_dir_url(__FILE__) . 'deepseek-chat.js', array('marked-js'), null, true);
+            wp_enqueue_script('deepseek-chat-script', plugin_dir_url(__FILE__) . 'wpai-chat.js', array('marked-js'), null, true);
 
             // 传递PHP变量到JavaScript
             wp_localize_script(
@@ -795,6 +795,7 @@ function deepseek_chat_shortcode() {
         ?>         
     </div>
 </div>
+<div id="bottom-description" style="margin-top: 5px; text-align: center;">内容由Ai自动生成，不代表本站观点。</div>
         <?php
     }
     return ob_get_clean();

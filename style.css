@@ -5,49 +5,12 @@ body {
     padding: 0;
     color: #333;
 }
-#deepseek-tutorial-link {
-    margin-top: 10px;
-    margin-bottom: 20px;
-    text-align: center;
-    display: inline-block;
-    margin-left: auto;
-    margin-right: auto;
-    background-image: linear-gradient(to right, #6a11cb 0%, #2575fc 100%);
-    border: none;
-    border-radius: 8px;
-    padding: 12px 20px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
-                0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    transition: all 0.3s ease;
-}
-
-#deepseek-tutorial-link:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
-                0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    background-image: linear-gradient(to left, #6a11cb 0%, #2575fc 100%);
-}
-
-#deepseek-tutorial-link a {
-    color: #ffffff;
-    text-decoration: none;
-    font-family: 'Inter', sans-serif;
-    font-size: 16px;
-    font-weight: 500;
-    letter-spacing: 0.025em;
-    transition: color 0.3s ease;
-}
-
-#deepseek-tutorial-link a:hover {
-    color: #f3f4f6;
-    text-decoration: none;
-}
 
 /* 容器样式 */
 #deepseek-chat-container {
     display: flex;
     height: 80vh;
-    max-width: 1200px;
+    max-width: 80%;
     margin: 20px auto;
     border: none;
     border-radius: 16px;
@@ -385,6 +348,45 @@ body {
 
 .pre-copy-button:active {
     transform: translateX(-50%) scale(0.98);
+}
+
+/* 教程链接 */
+#deepseek-tutorial-link {
+    margin-top: 10px;
+    margin-bottom: 20px;
+    text-align: center;
+    display: inline-block;
+    margin-left: auto;
+    margin-right: auto;
+    background-image: linear-gradient(to right, #6a11cb 0%, #2575fc 100%);
+    border: none;
+    border-radius: 8px;
+    padding: 12px 20px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transition: all 0.3s ease;
+}
+
+#deepseek-tutorial-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+                0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    background-image: linear-gradient(to left, #6a11cb 0%, #2575fc 100%);
+}
+
+#deepseek-tutorial-link a {
+    color: #ffffff;
+    text-decoration: none;
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0.025em;
+    transition: color 0.3s ease;
+}
+
+#deepseek-tutorial-link a:hover {
+    color: #f3f4f6;
+    text-decoration: none;
 }
 
 /* 响应式优化 */
