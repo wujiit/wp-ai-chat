@@ -3,7 +3,7 @@
 # 小半WordPress ai助手  
 
 [![License](https://img.shields.io/badge/license-GPL-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.4-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/3.4)
+[![Version](https://img.shields.io/badge/version-3.5-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/3.5)
 [![WordPress](https://img.shields.io/badge/WordPress-6.7-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.0-orange.svg)](https://www.php.net/)
 
@@ -18,35 +18,39 @@
 
 ## 🚀 功能特性
 
-1.内置deepseek接口  
-2.内置阿里通义千问接口  
-3.内置百度千帆接口  
-4.内置豆包接口  
-5.内置Kimi接口  
-6.内置Openai接口  
-7.内置腾讯混元接口  
-8.支持自定义ai文本模型接口  
-9.支持通义千问的图片生成模型  
-10.模型参数自定义填写  
-11.系统会用一个单独的数据表保存对话记录的第一句  
-12.用户可以删掉自己的历史对话记录  
-13.后台可以删掉用户的对话记录  
-14.可以通过关键词生成文章  
-15.可以通过ai接口对文章进行总结  
-16.前台显示ai助手入口  
-17.只允许登录用户使用  
-18.支持Markdown格式(需要ai返回的是markdown格式)  
-19.DeepSeek余额信息  
-20.通过ai接口对文章进行翻译  
-21.支持对接腾讯云、百度云TTS服务实现朗读文章内容  
-22.可以实现朗读ai回复的文字内容  
-23.可以自定义提示词  
-24.支持对接文多多aippt实现生成PPT  
-25.自定义提示词教程  
-26.Markdown内容板块会自动加载复制按钮  
-27.支持违规关键词检测  
-28.文章翻译和语音播放可以排除指定文章  
-29.支持通义千问联网搜索
+
+1. 内置 deepseek 文本接口  
+1. 内置阿里通义千问文本接口  
+1. 内置百度千帆(文心一言)文本接口  
+1. 内置豆包 ai 文本接口  
+1. 内置 Kimi 文本接口  
+1. 内置 OpenAI 文本接口  
+1. 内置腾讯混元文本接口  
+1. 内置 Grok 文本接口  
+1. 内置自定义 AI 文本模型接口  
+1. 支持阿里智能体应用对接  
+1. 支持文多多 AIPPT 接口生成 PPT 文件  
+1. 支持通义千问的图片生成模型  
+1. 支持通义千问联网搜索(仅部分模型支持)  
+1. 模型参数是自定义填写  
+1. 系统会用一个单独的数据表保存对话记录的第一句  
+1. 用户可以删掉自己的历史对话记录  
+1. 后台可以删掉用户的对话记录  
+1. 后台可以删掉用户的智能体应用对话  
+1. 可以通过关键词生成文章  
+1. 可以通过 AI 接口对文章进行总结  
+1. 前台显示 AI 助手入口  
+1. 只允许登录用户使用  
+1. 支持 Markdown 格式(需要 AI 返回的是 Markdown 格式)  
+1. DeepSeek 余额信息  
+1. 通过 AI 接口对文章进行翻译  
+1. 支持对接腾讯云、百度云 TTS 服务实现语音播放文章内容  
+1. 可以实现语音播放 AI 回复的文字内容  
+1. 可以自定义提示词  
+1. 自定义提示词教程链接  
+1. Markdown 内容板块自动加载复制按钮  
+1. 支持违规关键词检测  
+1. AI 生成 PPT 可以验证会员权限(部分网站可能不行)  
 
 
 ## 📥 安装
@@ -64,11 +68,11 @@ php版本：php 8.0
 
 插件启用会自动创建一个前台对话页面。如果没有自动创建，就自己手动加短代码：  [deepseek_chat]  
 
-1 - 文章翻译的接口要单独设置，因为这本来是我另外一个插件的，我合并过来了，不想折腾，就直接用了。 
-2 - ai生成PPT也是独立插件进行的合并，并且这个功能原本是根据我自己用的主题调整的，可能兼容性不好。  
+1 - 文章翻译的接口要单独设置，因为这本来是我另外一个插件的，我合并过来了，不想折腾，就直接用了。   
+2 - ai生成PPT也是独立插件进行的合并，并且这个功能原本是根据我自己用的主题调整的，可能兼容性不好。    
 
 
-如果插件不用了，自己到数据库去删掉这个数据表：deepseek_chat_logs  
+如果插件彻底不用了，自己到数据库去删掉这个数据表：deepseek_chat_logs、deepseek_agent_chat_logs这2个数据表。
 
 教程：https://www.wujiit.com/wpaidocs
 
@@ -76,6 +80,18 @@ php版本：php 8.0
 
 这款插件最早是为了测试deepseek自己写代码的能力，有一部分是deepseek自己写的代码(ai对话对接deepseek和最早版本的文章生成)，后面又合并了其他插件，所以代码里面的函数名称啥的看起来很乱，但是都写了注释。  
 
+
+## 文件说明
+
+主文件： wp-ai-chat.php  
+翻译语音文件： wpaitranslate.php  
+ai生成ppt文件： wpaippt.php  
+智能体应用文件： wpaidashscope.php  
+主要js文件： wpai-chat.js  
+css文件：wpai-style.css  
+翻译语音js文件： wpai-script.js  
+ppt调用js文件： docmee-ui-sdk-iframe.min.js  
+Markdown解析文件： marked.min.js 
 
 
 ![4131f8aa8b30d96706bc74514b5bb5d4.jpeg](https://i.miji.bid/2025/02/21/4131f8aa8b30d96706bc74514b5bb5d4.jpeg)
