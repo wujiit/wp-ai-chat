@@ -1,6 +1,5 @@
 // 将Markdown文本转换为HTML
 function convertMarkdownToHTML(markdownText) {
-    // 使用Marked库进行转换
     return marked.parse(markdownText);
 }
 
@@ -12,41 +11,69 @@ var adminAjaxUrl = DEEPSEEK_VARS.ADMIN_AJAX_URL;
 var enableKeywordDetection = parseInt(DEEPSEEK_VARS.ENABLE_KEYWORD_DETECTION);
 var keywords = DEEPSEEK_VARS.KEYWORDS.split(',');
 
-// 全局当前对话ID变量
-var currentConversationId = null; 
+// 全局变量
+var currentConversationId = null; // 普通对话ID
+var currentAppId = null;          // 智能体应用ID
+var showingAgents = false;        // 是否显示智能体应用列表
+var currentPage = 'home';         // 当前页面状态：'home', 'conversation', 'agent', 'agentList'
 
-// 封装一个设置对话ID的函数，同时更新localStorage
+// 设置当前页面状态
+function setCurrentPage(page) {
+    currentPage = page;
+    localStorage.setItem('currentPage', page);
+}
+
+// 设置普通对话 ID
 function setCurrentConversationId(id) {
     currentConversationId = id;
     if (id) {
-        // 将对话ID存储到localStorage中
         localStorage.setItem('currentConversationId', id);
+        setCurrentPage('conversation');
     } else {
-        // 若ID为空，从localStorage中移除对话ID
         localStorage.removeItem('currentConversationId');
+        setCurrentPage('home');
     }
+    currentAppId = null;
+    localStorage.removeItem('currentAppId');
 }
 
-// 页面加载时，检测localStorage中是否有对话ID
-window.addEventListener('load', function() {
-    var storedId = localStorage.getItem('currentConversationId');
-    if (storedId) {
-        // 设置当前对话ID
-        setCurrentConversationId(storedId);
-        // 加载聊天记录
-        loadChatLog(storedId);
+// 设置智能体应用 ID
+function setCurrentAppId(appId) {
+    currentAppId = appId;
+    if (appId) {
+        localStorage.setItem('currentAppId', appId);
+        setCurrentPage('agent');
+    } else {
+        localStorage.removeItem('currentAppId');
+        setCurrentPage('home');
     }
-});
+    currentConversationId = null;
+    localStorage.removeItem('currentConversationId');
+}
 
-// 页面加载时恢复滑动开关状态
+// 页面加载时恢复状态
 window.addEventListener('load', function() {
-    var storedId = localStorage.getItem('currentConversationId');
-    if (storedId) {
-        setCurrentConversationId(storedId);
-        loadChatLog(storedId);
-    }
+    var storedConversationId = localStorage.getItem('currentConversationId');
+    var storedAppId = localStorage.getItem('currentAppId');
+    var storedShowingAgents = localStorage.getItem('showingAgents') === 'true';
+    var storedPage = localStorage.getItem('currentPage') || 'home';
 
-    // 恢复联网搜索开关状态
+    currentPage = storedPage;
+
+    // 只在需要恢复特定状态时操作，不干扰首页
+    if (storedPage === 'conversation' && storedConversationId) {
+        setCurrentConversationId(storedConversationId);
+        loadChatLog(storedConversationId);
+    } else if (storedPage === 'agent' && storedAppId) {
+        setCurrentAppId(storedAppId);
+        loadAgentChat(storedAppId);
+    } else if (storedPage === 'agentList' || storedShowingAgents) {
+        showingAgents = true;
+        setCurrentPage('agentList');
+        loadAgentList();
+    }
+    // 如果是 'home'，不做任何操作，保持首页原始状态
+
     var enableSearchSwitch = document.getElementById('enable-search');
     if (enableSearchSwitch) {
         var storedSearchState = localStorage.getItem('enableSearchState');
@@ -54,23 +81,20 @@ window.addEventListener('load', function() {
     }
 });
 
-// 默认提示    
+// 默认提示
 document.getElementById('deepseek-chat-input').addEventListener('input', function() {
     var prompt = document.getElementById('chatbot-prompt');
     if (prompt) {
-        // 隐藏提示消息
-        prompt.style.display = 'none'; 
+        prompt.style.display = 'none';
     }
-    // 控制自定义提示词板块的显示状态
     var customPrompts = document.getElementById('deepseek-custom-prompts');
     if (customPrompts) {
-        // 当输入框非空时，隐藏提示词板块
         if (this.value.trim().length > 0) {
             customPrompts.style.display = 'none';
         } else {
             customPrompts.style.display = 'block';
         }
-    }        
+    }
 });
 
 // 检测关键词
@@ -84,44 +108,125 @@ document.addEventListener('DOMContentLoaded', function() {
     const inputField = document.getElementById('deepseek-chat-input');
     const errorMessage = document.getElementById('keyword-error-message');
 
-    sendButton.addEventListener('click', function(event) {
-        const message = inputField.value.trim();
-
-        if (enableKeywordDetection && containsForbiddenKeyword(message)) {
-            errorMessage.style.display = 'block';
-            event.preventDefault(); // 阻止发送
-        } else {
-            errorMessage.style.display = 'none';
-        }
-    });
+    if (sendButton && inputField) {
+        sendButton.addEventListener('click', function(event) {
+            const message = inputField.value.trim();
+            if (enableKeywordDetection && containsForbiddenKeyword(message)) {
+                if (errorMessage) errorMessage.style.display = 'block';
+                event.preventDefault();
+            } else {
+                if (errorMessage) errorMessage.style.display = 'none';
+            }
+        });
+    }
 });
+
+// 添加语音播放功能
+function addVoicePlayback(container, text) {
+    if (!aiVoiceEnabled) return;
+
+    var playIcon = document.createElement('span');
+    playIcon.classList.add('ai-tts-play');
+    playIcon.innerHTML = '&#128266;';
+    playIcon.style.marginLeft = '10px';
+    playIcon.addEventListener('click', function() {
+        var audioElem = document.getElementById('ai-tts-audio');
+        if (!audioElem) {
+            audioElem = document.createElement('audio');
+            audioElem.id = 'ai-tts-audio';
+            audioElem.style.display = 'none';
+            document.body.appendChild(audioElem);
+        }
+        var existingMessage = playIcon.nextElementSibling;
+        if (existingMessage && existingMessage.classList.contains('tts-message')) {
+            existingMessage.remove();
+        }
+        var messageSpan = document.createElement('span');
+        messageSpan.classList.add('tts-message');
+        messageSpan.textContent = '语音准备中...';
+        messageSpan.style.marginLeft = '5px';
+        messageSpan.style.color = '#666';
+        playIcon.after(messageSpan);
+
+        if (audioElem.audioUrls) {
+            if (!audioElem.paused) {
+                audioElem.pause();
+                playIcon.innerHTML = '&#128264;';
+            } else {
+                audioElem.play();
+                playIcon.innerHTML = '&#128266;';
+            }
+            return;
+        }
+        var dataParams = new URLSearchParams();
+        dataParams.append('action', 'deepseek_tts');
+        dataParams.append('text', text);
+        fetch(adminAjaxUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: dataParams
+        })
+        .then(response => response.json())
+        .then(ttsData => {
+            if (ttsData.success) {
+                var audio_urls = ttsData.data.audio_urls;
+                if (audio_urls && audio_urls.length > 0) {
+                    audioElem.audioUrls = audio_urls;
+                    audioElem.currentIndex = 0;
+                    audioElem.src = audio_urls[0];
+                    audioElem.onplay = function() { messageSpan.remove(); };
+                    audioElem.play();
+                    playIcon.innerHTML = '&#128266;';
+                    audioElem.onended = function() {
+                        audioElem.currentIndex++;
+                        if (audioElem.currentIndex < audio_urls.length) {
+                            audioElem.src = audio_urls[audioElem.currentIndex];
+                            audioElem.play();
+                        } else {
+                            delete audioElem.audioUrls;
+                            audioElem.currentIndex = 0;
+                            playIcon.innerHTML = '&#128266;';
+                        }
+                    };
+                }
+            } else {
+                messageSpan.textContent = '语音朗读失败';
+                messageSpan.style.color = 'red';
+            }
+        })
+        .catch(() => {
+            messageSpan.textContent = '请求错误，请重试';
+            messageSpan.style.color = 'red';
+        });
+    });
+    container.appendChild(playIcon);
+}
 
 // 发送消息
 document.getElementById('deepseek-chat-send').addEventListener('click', function() {
     var message = document.getElementById('deepseek-chat-input').value;
-    if (message) {
-        // 判断是否为新对话，保存当前消息作为对话标题
-        var newConversation = false;
-        var currentMessage = message; // 新对话时，用第一句作为标题
-        if (!currentConversationId) {
-            newConversation = true;
-        }
-        
-        // 显示“小助手正在思考中...”的提示
+    if (!message) return;
+
+    if (currentAppId) {
+        sendAgentMessage(message, currentAppId);
+    } else {
+        var newConversation = !currentConversationId;
+        var currentMessage = message;
+
         var thinkingMessage = document.createElement('div');
         thinkingMessage.id = 'deepseek-thinking-message';
         thinkingMessage.className = 'message-bubble bot';
         thinkingMessage.innerHTML = '小助手正在思考中...';
         document.getElementById('deepseek-chat-messages').appendChild(thinkingMessage);
 
-        // 获取联网搜索开关状态并保存到localStorage
         var enableSearchSwitch = document.getElementById('enable-search');
         var enableSearch = enableSearchSwitch ? enableSearchSwitch.checked : false;
         if (enableSearchSwitch) {
             localStorage.setItem('enableSearchState', enableSearch);
         }
 
-        // 使用REST API接口，传输JSON数据，并附加nonce进行权限验证
         fetch(restUrl, {
             method: 'POST',
             headers: {
@@ -136,11 +241,9 @@ document.getElementById('deepseek-chat-send').addEventListener('click', function
         })
         .then(response => {
             const contentType = response.headers.get('Content-Type') || '';
-            // 如果返回JSON，则按非流式逻辑处理(图片生成)
             if (contentType.indexOf('application/json') !== -1) {
                 return response.json().then(data => ({ data, isJson: true }));
             } else {
-                // 否则走流式文本返回
                 return { response };
             }
         })
@@ -149,10 +252,7 @@ document.getElementById('deepseek-chat-send').addEventListener('click', function
                 var data = result.data;
                 if (data.success) {
                     if (data.is_image) {
-                        // 图片生成处理
                         handleImageGeneration(data.task_id);
-
-                        // 如果当前对话为空，则更新历史记录（仅新对话需要更新对话id）
                         if (!currentConversationId) {
                             var historyContainer = document.querySelector('#deepseek-chat-history ul');
                             var newChatItem = document.createElement('li');
@@ -161,12 +261,10 @@ document.getElementById('deepseek-chat-send').addEventListener('click', function
                                 '<button class="deepseek-delete-log" data-conversation-id="' + data.conversation_id + '">删除</button>';
                             historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
 
-                            // 绑定新历史记录的点击事件
                             newChatItem.addEventListener('click', function() {
                                 loadChatLog(data.conversation_id);
                             });
 
-                            // 绑定新历史记录的删除按钮事件
                             newChatItem.querySelector('.deepseek-delete-log').addEventListener('click', function() {
                                 var conversationId = this.getAttribute('data-conversation-id');
                                 fetch(adminAjaxUrl, {
@@ -179,10 +277,8 @@ document.getElementById('deepseek-chat-send').addEventListener('click', function
                                 .then(data => {
                                     if (data.success) {
                                         this.parentElement.remove();
-                                        // 清空消息框内容
                                         document.getElementById('deepseek-chat-messages').innerHTML = '';
-                                        // 重置当前对话id
-                                        currentConversationId = null;
+                                        setCurrentConversationId(null);
                                     }
                                 });
                             });
@@ -192,221 +288,97 @@ document.getElementById('deepseek-chat-send').addEventListener('click', function
                     }
                 }
             } else {
-                // 流式文本回复处理
                 var messagesContainer = document.getElementById('deepseek-chat-messages');
-                
-                // 移除“小助手正在思考中...”的提示
-                var thinkingMessage = document.getElementById('deepseek-thinking-message');
-                if (thinkingMessage) {
-                    thinkingMessage.remove();
-                }
-
-                // 添加用户消息
+                thinkingMessage.remove();
                 messagesContainer.innerHTML += '<div class="message-bubble user">' + message + '</div>';
-                
-                // 添加一个消息框div，用于显示AI回复
                 var botMessageContainer = document.createElement('div');
                 botMessageContainer.classList.add('message-bubble', 'bot');
-                botMessageContainer.textContent = '';  // 初始为空，逐步填充
+                botMessageContainer.textContent = '';
                 messagesContainer.appendChild(botMessageContainer);
 
-                // 使用ReadableStream API对SSE格式的数据做处理
                 const reader = result.response.body.getReader();
                 const decoder = new TextDecoder();
                 let botReply = '';
-                let buffer = '';
-                
-                // 在解析到conversation_id时，如果是新对话则更新历史记录
-                function processLine(line) {
-                    line = line.trim();
-                    if (!line.startsWith("data:")) return;
-                    let dataPart = line.substring(5).trim();
-                    if (dataPart === "[DONE]") return;
-                    try {
-                        let jsonData = JSON.parse(dataPart);
-                        if (jsonData.conversation_id) {
-                            // 如果是新对话，则在历史对话列表中插入对话标题（用户第一条消息）
-                            if (newConversation) {
-                                setCurrentConversationId(jsonData.conversation_id);
-                                var historyContainer = document.querySelector('#deepseek-chat-history ul');
-                                var newChatItem = document.createElement('li');
-                                newChatItem.setAttribute('data-conversation-id', jsonData.conversation_id);
-                                newChatItem.innerHTML = '<span class="deepseek-chat-title">' + currentMessage + '</span>' +
-                                    '<button class="deepseek-delete-log" data-conversation-id="' + jsonData.conversation_id + '">删除</button>';
-                                historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
-                                // 绑定点击加载对话
-                                newChatItem.addEventListener('click', function() {
-                                    loadChatLog(jsonData.conversation_id);
-                                });
-                                // 绑定删除按钮事件
-                                newChatItem.querySelector('.deepseek-delete-log').addEventListener('click', function(e) {
-                                    e.stopPropagation();
-                                    var conversationId = this.getAttribute('data-conversation-id');
-                                    fetch(adminAjaxUrl, {
-                                        method: 'POST',
-                                        headers: {
-                                            'Content-Type': 'application/x-www-form-urlencoded',
-                                        },
-                                        body: 'action=deepseek_delete_log&conversation_id=' + conversationId
-                                    }).then(response => response.json())
-                                    .then(data => {
-                                        if (data.success) {
-                                            this.parentElement.remove();
-                                            document.getElementById('deepseek-chat-messages').innerHTML = '';
-                                            setCurrentConversationId(null);
-                                        }
-                                    });
-                                });
-                                newConversation = false; // 标记已更新历史记录
-                                console.log('新对话历史记录已更新，对话ID：', jsonData.conversation_id);
-                            } else {
-                                setCurrentConversationId(jsonData.conversation_id);
-                            }
-                            return;
-                        }
-                        if (jsonData && jsonData.choices && jsonData.choices.length > 0) {
-                            let delta = jsonData.choices[0].delta;
-                            if (delta && delta.content) {
-                                botReply += delta.content;
-                                botMessageContainer.textContent = botReply;
-                            }
-                        }
-                    } catch(e) {
-                        console.error("解析SSE错误", e);
-                    }
-                }
-                
-                function readStream() {
+
+                function processStream() {
                     reader.read().then(({done, value}) => {
                         if (done) {
-                            // 处理最后剩余的不完整数据
-                            if (buffer.length > 0) {
-                                let lines = buffer.split("\n");
-                                lines.forEach(processLine);
-                            }
-                            // 流结束后，将Markdown转换为HTML显示
                             botMessageContainer.innerHTML = convertMarkdownToHTML(botReply);
-                            // 添加复制按钮到新生成的pre标签
                             addCopyButtonsToPreTags(botMessageContainer);
-                            if (aiVoiceEnabled) {
-                                var playIcon = document.createElement('span');
-                                playIcon.classList.add('ai-tts-play');
-                                playIcon.innerHTML = '&#128266;';
-                                playIcon.style.marginLeft = '10px';
-                                playIcon.addEventListener('click', function() {
-                                    var audioElem = document.getElementById('ai-tts-audio');
-                                    if (!audioElem) {
-                                        audioElem = document.createElement('audio');
-                                        audioElem.id = 'ai-tts-audio';
-                                        audioElem.style.display = 'none';
-                                        document.body.appendChild(audioElem);
-                                    }
-                                    // 先移除可能存在的旧提示
-                                    var existingMessage = playIcon.nextElementSibling;
-                                    if (existingMessage && existingMessage.classList.contains('tts-message')) {
-                                        existingMessage.remove();
-                                    }
-
-                                    // 创建“语音准备中”提示
-                                    var messageSpan = document.createElement('span');
-                                    messageSpan.classList.add('tts-message');
-                                    messageSpan.textContent = '语音准备中...';
-                                    messageSpan.style.marginLeft = '5px';
-                                    messageSpan.style.color = '#666';
-                                    playIcon.after(messageSpan);
-
-                                    if (audioElem.audioUrls) {
-                                        if (!audioElem.paused) {
-                                            audioElem.pause();
-                                            playIcon.innerHTML = '&#128264;';
+                            addVoicePlayback(botMessageContainer, botReply);
+                            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                            document.getElementById('deepseek-chat-input').value = '';
+                            return;
+                        }
+                        const chunk = decoder.decode(value, { stream: true });
+                        const lines = chunk.split('\n');
+                        lines.forEach(line => {
+                            line = line.trim();
+                            if (line.startsWith('data: ')) {
+                                const dataPart = line.substring(6).trim();
+                                if (dataPart === '[DONE]') return;
+                                try {
+                                    const jsonData = JSON.parse(dataPart);
+                                    if (jsonData.conversation_id) {
+                                        if (newConversation) {
+                                            setCurrentConversationId(jsonData.conversation_id);
+                                            var historyContainer = document.querySelector('#deepseek-chat-history ul');
+                                            var newChatItem = document.createElement('li');
+                                            newChatItem.setAttribute('data-conversation-id', jsonData.conversation_id);
+                                            newChatItem.innerHTML = '<span class="deepseek-chat-title">' + currentMessage + '</span>' +
+                                                '<button class="deepseek-delete-log" data-conversation-id="' + jsonData.conversation_id + '">删除</button>';
+                                            historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
+                                            newChatItem.addEventListener('click', function() {
+                                                loadChatLog(jsonData.conversation_id);
+                                            });
+                                            newChatItem.querySelector('.deepseek-delete-log').addEventListener('click', function(e) {
+                                                e.stopPropagation();
+                                                var conversationId = this.getAttribute('data-conversation-id');
+                                                fetch(adminAjaxUrl, {
+                                                    method: 'POST',
+                                                    headers: {
+                                                        'Content-Type': 'application/x-www-form-urlencoded',
+                                                    },
+                                                    body: 'action=deepseek_delete_log&conversation_id=' + conversationId
+                                                }).then(response => response.json())
+                                                .then(data => {
+                                                    if (data.success) {
+                                                        this.parentElement.remove();
+                                                        document.getElementById('deepseek-chat-messages').innerHTML = '';
+                                                        setCurrentConversationId(null);
+                                                    }
+                                                });
+                                            });
+                                            newConversation = false;
                                         } else {
-                                            audioElem.play();
-                                            playIcon.innerHTML = '&#128266;';
+                                            setCurrentConversationId(jsonData.conversation_id);
                                         }
                                         return;
                                     }
-                                    var dataParams = new URLSearchParams();
-                                    dataParams.append('action', 'deepseek_tts');
-                                    dataParams.append('text', botReply);
-                                    fetch(adminAjaxUrl, {
-                                        method: 'POST',
-                                        headers: {
-                                            'Content-Type': 'application/x-www-form-urlencoded',
-                                        },
-                                        body: dataParams
-                                    })
-                                   .then(response => response.json())
-                                   .then(ttsData => {
-                                        if (ttsData.success) {
-                                            var audio_urls = ttsData.data.audio_urls;
-                                            if (audio_urls && audio_urls.length > 0) {
-                                                audioElem.audioUrls = audio_urls;
-                                                audioElem.currentIndex = 0;
-                                                audioElem.src = audio_urls[0];
-                                                // 当音频开始播放时移除提示
-                                                audioElem.onplay = function() {
-                                                    messageSpan.remove();
-                                                };
-
-                                                audioElem.play();
-                                                playIcon.innerHTML = '&#128266;';
-                                                audioElem.onended = function() {
-                                                    audioElem.currentIndex++;
-                                                    if (audioElem.currentIndex < audio_urls.length) {
-                                                        audioElem.src = audio_urls[audioElem.currentIndex];
-                                                        audioElem.play();
-                                                    } else {
-                                                        delete audioElem.audioUrls;
-                                                        audioElem.currentIndex = 0;
-                                                        playIcon.innerHTML = '&#128266;';
-                                                    }
-                                                };
-                                            }
-                                        } else {
-                                            messageSpan.textContent = '语音朗读失败';
-                                            messageSpan.style.color = 'red';
+                                    if (jsonData.choices && jsonData.choices.length > 0) {
+                                        let delta = jsonData.choices[0].delta;
+                                        if (delta && delta.content) {
+                                            botReply += delta.content;
+                                            botMessageContainer.innerHTML = convertMarkdownToHTML(botReply);
+                                            messagesContainer.scrollTop = messagesContainer.scrollHeight;
                                         }
-                                    })
-                                   .catch(() => {
-                                        messageSpan.textContent = '请求错误，请重试';
-                                        messageSpan.style.color = 'red';
-                                    });
-                                });                                
-                                botMessageContainer.appendChild(playIcon);
+                                    }
+                                } catch (e) {
+                                    console.error('解析SSE错误:', e, '原始数据:', dataPart);
+                                }
                             }
-                            // 清空输入框
-                            document.getElementById('deepseek-chat-input').value = '';
-                            // 滚动消息框到最底部
-                            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                            return;
-                        }
-                        const chunk = decoder.decode(value, {stream: true});
-                        buffer += chunk;
-                        let lines = buffer.split("\n");
-                        // 将最后一行可能不完整的数据保留到buffer中
-                        buffer = lines.pop();
-                        lines.forEach(processLine);
-                        readStream();
+                        });
+                        processStream();
                     });
                 }
-                readStream();
+                processStream();
             }
         })
-        // 如果fetch请求出错，则将提示信息修改为“网络错误，请稍后重试”
         .catch(error => {
             console.error('Fetch request failed:', error);
             var errorMsg = document.getElementById('deepseek-thinking-message');
-            if (errorMsg) {
-                errorMsg.innerHTML = '网络错误，请稍后重试';
-            }
+            if (errorMsg) errorMsg.innerHTML = '网络错误，请稍后重试';
         });
-    }
-});
-
-// 如果需要，可以添加开关变化时的即时保存
-document.addEventListener('change', function(event) {
-    if (event.target.id === 'enable-search') {
-        localStorage.setItem('enableSearchState', event.target.checked);
     }
 });
 
@@ -416,19 +388,16 @@ function handleImageGeneration(taskId) {
     var thinkingMessage = document.getElementById('deepseek-thinking-message');
     if (thinkingMessage) thinkingMessage.remove();
 
-    // 添加用户消息
     var userMessage = document.createElement('div');
     userMessage.className = 'message-bubble user';
     userMessage.textContent = document.getElementById('deepseek-chat-input').value;
     messagesContainer.appendChild(userMessage);
 
-    // 添加加载状态
     var loadingContainer = document.createElement('div');
     loadingContainer.className = 'message-bubble bot';
     loadingContainer.innerHTML = '图片生成中...';
     messagesContainer.appendChild(loadingContainer);
 
-    // 轮询检查任务状态
     var checkInterval = setInterval(function() {
         fetch(adminAjaxUrl, {
             method: 'POST',
@@ -439,36 +408,28 @@ function handleImageGeneration(taskId) {
             if (data.task_status === 'SUCCEEDED') {
                 clearInterval(checkInterval);
                 loadingContainer.remove();
-                
-                // 创建消息容器
+
                 var botMessage = document.createElement('div');
                 botMessage.className = 'message-bubble bot';
-
-                // 创建图片描述容器
                 var promptContainer = document.createElement('div');
                 promptContainer.className = 'image-prompt';
                 botMessage.appendChild(promptContainer);
-
-                // 创建图片容器
                 var imageContainer = document.createElement('img');
                 imageContainer.src = data.image_url;
                 imageContainer.style.maxWidth = '100%';
                 imageContainer.style.height = 'auto';
                 botMessage.appendChild(imageContainer);
-
-                // 将消息容器添加到消息框中
                 messagesContainer.appendChild(botMessage);
 
-                // 实现逐字显示效果
                 var actualPrompt = data.actual_prompt;
                 var index = 0;
-                var typingSpeed = 50; // 控制打字速度
+                var typingSpeed = 50;
 
                 function typeWriter() {
                     if (index < actualPrompt.length) {
                         promptContainer.innerHTML += actualPrompt.charAt(index);
                         index++;
-                        setTimeout(typeWriter, typingSpeed); // 使用setTimeout模拟打字速度
+                        setTimeout(typeWriter, typingSpeed);
                     }
                 }
                 typeWriter();
@@ -488,7 +449,7 @@ function typeWriter(text, container, callback) {
         if (i < text.length) {
             container.innerHTML += text.charAt(i);
             i++;
-            setTimeout(() => addChar(), speed); 
+            setTimeout(() => addChar(), speed);
         } else if (callback) {
             callback();
         }
@@ -496,11 +457,21 @@ function typeWriter(text, container, callback) {
     addChar();
 }
 
-// 开启新对话时，清空消息区和localStorage中保存的当前对话ID
+// 开启新对话时，清空消息区和 localStorage 中的当前对话 ID
 document.getElementById('deepseek-new-chat').addEventListener('click', function() {
     document.getElementById('deepseek-chat-messages').innerHTML = '';
     document.getElementById('deepseek-chat-input').value = '';
     setCurrentConversationId(null);
+    showingAgents = false;
+    localStorage.setItem('showingAgents', 'false');
+    setCurrentPage('home');
+});
+
+// 开关变化时的保存
+document.addEventListener('change', function(event) {
+    if (event.target.id === 'enable-search') {
+        localStorage.setItem('enableSearchState', event.target.checked);
+    }
 });
 
 // 复制按钮pre标签的函数
@@ -513,28 +484,23 @@ function addCopyButtonsToPreTags(container) {
         copyButton.addEventListener('click', () => {
             const textToCopy = pre.textContent;
             navigator.clipboard.writeText(textToCopy)
-              .then(() => {
-                    console.log('复制成功');
-                    // 修改按钮文本
-                    const originalText = copyButton.textContent;
-                    copyButton.textContent = '复制成功';
-                    setTimeout(() => {
-                        copyButton.textContent = originalText;
-                    }, 1500);
-                })
-              .catch(err => {
-                    console.error('复制失败: ', err);
-                });
+            .then(() => {
+                console.log('复制成功');
+                const originalText = copyButton.textContent;
+                copyButton.textContent = '复制成功';
+                setTimeout(() => { copyButton.textContent = originalText; }, 1500);
+            })
+            .catch(err => console.error('复制失败: ', err));
         });
         pre.parentNode.insertBefore(copyButton, pre.nextSibling);
     });
 }
 
-//加载历史对话记录时的内容渲染
+// 加载历史对话记录时的内容渲染
 function loadChatLog(conversationId) {
     fetch(adminAjaxUrl + '?action=deepseek_load_log&conversation_id=' + conversationId)
-   .then(response => response.json())
-   .then(data => {
+    .then(response => response.json())
+    .then(data => {
         if (data.success) {
             var messagesContainer = document.getElementById('deepseek-chat-messages');
             messagesContainer.innerHTML = '';
@@ -544,45 +510,47 @@ function loadChatLog(conversationId) {
                 botMessageElement.classList.add('message-bubble', 'bot');
                 botMessageElement.innerHTML = convertMarkdownToHTML(message.response);
                 messagesContainer.appendChild(botMessageElement);
-                // 历史消息加载时也添加复制按钮
                 addCopyButtonsToPreTags(botMessageElement);
+                addVoicePlayback(botMessageElement, message.response);
             });
-            // 加载完历史对话后更新当前对话ID（同时存入localStorage）
             setCurrentConversationId(conversationId);
         }
     });
 }
 
 // 绑定历史对话框的点击事件
-document.querySelectorAll('#deepseek-chat-history li').forEach(item => {
-    item.addEventListener('click', function() {
-        var conversationId = this.getAttribute('data-conversation-id');
-        loadChatLog(conversationId);
-    });
-
-    var deleteButton = item.querySelector('.deepseek-delete-log');
-    if (deleteButton) {
-        deleteButton.addEventListener('click', function() {
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('#deepseek-chat-history li').forEach(item => {
+        item.addEventListener('click', function() {
             var conversationId = this.getAttribute('data-conversation-id');
-            fetch(adminAjaxUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'action=deepseek_delete_log&conversation_id=' + conversationId
-            }).then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    this.parentElement.remove();
-                    document.getElementById('deepseek-chat-messages').innerHTML = '';
-                    setCurrentConversationId(null);
-                }
-            });
+            loadChatLog(conversationId);
         });
-    }
+
+        var deleteButton = item.querySelector('.deepseek-delete-log');
+        if (deleteButton) {
+            deleteButton.addEventListener('click', function(e) {
+                e.stopPropagation();
+                var conversationId = this.getAttribute('data-conversation-id');
+                fetch(adminAjaxUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: 'action=deepseek_delete_log&conversation_id=' + conversationId
+                }).then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        this.parentElement.remove();
+                        document.getElementById('deepseek-chat-messages').innerHTML = '';
+                        setCurrentConversationId(null);
+                    }
+                });
+            });
+        }
+    });
 });
 
-// 自定义提示词点击事件，点击后自动将提示词加上冒号插入输入框
+// 自定义提示词点击事件
 document.addEventListener('DOMContentLoaded', function() {
     var prompts = document.querySelectorAll('.deepseek-prompt');
     prompts.forEach(function(prompt) {
@@ -590,7 +558,6 @@ document.addEventListener('DOMContentLoaded', function() {
             var inputBox = document.getElementById('deepseek-chat-input');
             if (inputBox) {
                 var promptText = this.textContent.trim();
-                // 输入框内容预置提示词和冒号
                 if (!inputBox.value.startsWith(promptText + ':')) {
                     inputBox.value = promptText + ': ' + inputBox.value;
                 }
@@ -599,3 +566,191 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+// 加载智能体应用列表
+function loadAgentList() {
+    fetch(adminAjaxUrl + '?action=deepseek_get_agents')
+    .then(response => response.json())
+    .then(data => {
+        var messagesContainer = document.getElementById('deepseek-chat-messages');
+        messagesContainer.innerHTML = '';
+        var agentContainer = document.createElement('div');
+        agentContainer.className = 'agent-list';
+
+        if (data.success && data.data && data.data.agents && Array.isArray(data.data.agents)) {
+            if (data.data.agents.length === 0) {
+                messagesContainer.innerHTML = '<div class="message-bubble bot">暂无智能体应用</div>';
+            } else {
+                data.data.agents.forEach(agent => {
+                    var agentItem = document.createElement('div');
+                    agentItem.className = 'agent-item';
+                    agentItem.setAttribute('data-app-id', agent.app_id);
+                    agentItem.innerHTML = `
+                        <img src="${agent.icon || ''}" alt="${agent.name}" class="agent-icon">
+                        <div class="agent-info">
+                            <span class="agent-name">${agent.name}</span>
+                            <p class="agent-description">${agent.description || '暂无描述'}</p>
+                        </div>
+                    `;
+                    agentItem.addEventListener('click', function() {
+                        loadAgentChat(agent.app_id);
+                    });
+                    agentContainer.appendChild(agentItem);
+                });
+                messagesContainer.appendChild(agentContainer);
+                showingAgents = true;
+                setCurrentPage('agentList');
+                localStorage.setItem('showingAgents', 'true');
+            }
+        } else {
+            messagesContainer.innerHTML = '<div class="message-bubble bot">加载智能体应用失败，请检查后台配置</div>';
+            console.error('后端返回数据无效:', data);
+        }
+    })
+    .catch(error => {
+        console.error('加载智能体应用列表失败:', error);
+        var messagesContainer = document.getElementById('deepseek-chat-messages');
+        messagesContainer.innerHTML = '<div class="message-bubble bot">加载智能体应用失败，请稍后重试</div>';
+    });
+}
+
+// 点击“智能体”标题切换显示
+document.addEventListener('DOMContentLoaded', function() {
+    var agentToggle = document.getElementById('deepseek-agent-title');
+    if (agentToggle) {
+        agentToggle.addEventListener('click', function() {
+            var messagesContainer = document.getElementById('deepseek-chat-messages');
+            if (showingAgents) {
+                showingAgents = false;
+                localStorage.setItem('showingAgents', 'false');
+                setCurrentPage('home');
+                messagesContainer.innerHTML = '<div class="message-bubble bot" id="chatbot-prompt">你好，我可以帮你写作、写文案、翻译，有问题请问我~</div>';
+                var customPrompts = document.getElementById('deepseek-custom-prompts');
+                if (customPrompts) {
+                    customPrompts.style.display = 'block';
+                }
+                setCurrentConversationId(null);
+            } else {
+                loadAgentList();
+            }
+        });
+    }
+});
+
+// 加载智能体对话历史
+function loadAgentChat(appId) {
+    fetch(adminAjaxUrl + '?action=deepseek_load_agent_log&app_id=' + appId)
+    .then(response => response.json())
+    .then(data => {
+        var messagesContainer = document.getElementById('deepseek-chat-messages');
+        messagesContainer.innerHTML = '';
+        if (data.success && data.data && data.data.messages && Array.isArray(data.data.messages)) {
+            if (data.data.messages.length > 0) {
+                data.data.messages.forEach(message => {
+                    if (message.message) {
+                        messagesContainer.innerHTML += '<div class="message-bubble user">' + message.message + '</div>';
+                    }
+                    if (message.response) {
+                        var botMessage = document.createElement('div');
+                        botMessage.classList.add('message-bubble', 'bot');
+                        botMessage.innerHTML = convertMarkdownToHTML(message.response);
+                        messagesContainer.appendChild(botMessage);
+                        addCopyButtonsToPreTags(botMessage);
+                        addVoicePlayback(botMessage, message.response);
+                    }
+                });
+            } else {
+                messagesContainer.innerHTML = '<div class="message-bubble bot">欢迎使用智能体应用对话，请输入消息开始。</div>';
+            }
+        } else {
+            messagesContainer.innerHTML = '<div class="message-bubble bot">加载对话历史失败，请稍后重试</div>';
+        }
+        setCurrentAppId(appId);
+        showingAgents = false;
+        localStorage.setItem('showingAgents', 'false');
+        setCurrentPage('agent');
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    })
+    .catch(error => {
+        console.error('加载智能体应用对话失败:', error);
+        var messagesContainer = document.getElementById('deepseek-chat-messages');
+        messagesContainer.innerHTML = '<div class="message-bubble bot">网络错误，请稍后重试</div>';
+    });
+}
+
+// 发送智能体消息
+function sendAgentMessage(message, appId) {
+    var messagesContainer = document.getElementById('deepseek-chat-messages');
+    messagesContainer.innerHTML += '<div class="message-bubble user">' + message + '</div>';
+    var botMessageContainer = document.createElement('div');
+    botMessageContainer.classList.add('message-bubble', 'bot');
+    botMessageContainer.textContent = '智能体应用正在处理...';
+    messagesContainer.appendChild(botMessageContainer);
+
+    const agentUrl = restUrl.replace('send-message', 'send-agent-message');
+
+    fetch(agentUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-WP-Nonce': deepseek_rest_nonce
+        },
+        body: JSON.stringify({
+            message: message,
+            app_id: appId,
+            session_id: localStorage.getItem('currentSessionId') || null
+        })
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Network response was not ok: ' + response.status);
+        return response.body.getReader();
+    })
+    .then(reader => {
+        const decoder = new TextDecoder();
+        let botReply = '';
+
+        function processStream() {
+            reader.read().then(({ done, value }) => {
+                if (done) {
+                    botMessageContainer.innerHTML = convertMarkdownToHTML(botReply);
+                    addCopyButtonsToPreTags(botMessageContainer);
+                    addVoicePlayback(botMessageContainer, botReply);
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    console.log('智能体应用对话完成:', botReply);
+                    setTimeout(() => loadAgentChat(appId), 1000);
+                    document.getElementById('deepseek-chat-input').value = '';
+                    return;
+                }
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+                lines.forEach(line => {
+                    line = line.trim();
+                    if (line.startsWith('data: ')) {
+                        const dataPart = line.substring(6).trim();
+                        if (dataPart === '[DONE]') return;
+                        try {
+                            const jsonData = JSON.parse(dataPart);
+                            if (jsonData.error) {
+                                botMessageContainer.textContent = '错误: ' + jsonData.error;
+                                return;
+                            }
+                            if (jsonData.text) {
+                                botReply += jsonData.text;
+                                botMessageContainer.innerHTML = convertMarkdownToHTML(botReply);
+                                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                            }
+                        } catch (e) {
+                            console.error('解析 SSE 数据错误:', e, '原始数据:', dataPart);
+                        }
+                    }
+                });
+                processStream();
+            });
+        }
+        processStream();
+    })
+    .catch(error => {
+        console.error('发送智能体应用消息失败:', error);
+        botMessageContainer.textContent = '网络错误，请稍后重试';
+    });
+}
