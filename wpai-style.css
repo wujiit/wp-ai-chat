@@ -93,11 +93,13 @@ body {
 #deepseek-chat-messages {
     flex: 1;
     padding: 20px;
-    padding-bottom: 40px;
+    padding-bottom: 60px;
     overflow-y: auto;
     background: #ffffff;
-    display: flex; /* 使用 flex 布局 */
-    flex-direction: column; /* 垂直排列消息 */
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    scroll-behavior: smooth;
 }
 
 /* 消息气泡 */
@@ -114,7 +116,7 @@ body {
 
 /* 最后一个消息气泡额外处理 */
 .message-bubble:last-child {
-    margin-bottom: 20px; /* 最后一个消息增加更多间距 */
+    margin-bottom: 20px;
 }
 
 .message-bubble.user {
@@ -186,7 +188,7 @@ body {
     max-width: 100%;
 }
 
-/* 代码行高亮*/
+/* 代码行高亮 */
 .message-bubble pre .hljs {
     background: #2d2d2d !important;
     color: #ffffff !important;
@@ -205,6 +207,8 @@ body {
 /* 输入框和发送按钮 */
 #deepseek-chat-input-container {
     display: flex;
+    position: relative;
+    min-height: 100px;
     padding: 15px 20px;
     border-top: 1px solid #e0e0e0;
     background: #f8f9fa;
@@ -329,6 +333,7 @@ body {
 .ai-tts-play:hover {
     background-color: #005177;
 }
+/* ai对话框语音朗读按钮 */
 
 /* 复制按钮样式 */
 .pre-copy-button {
@@ -359,6 +364,7 @@ body {
 .pre-copy-button:active {
     transform: translateX(-50%) scale(0.98);
 }
+/* 复制按钮样式 */
 
 /* 底部选项栏容器样式 */
 #deepseek-options-bar {
@@ -371,7 +377,7 @@ body {
     flex-wrap: wrap; /* 防止小屏幕溢出 */
 }
 
-/* 单个选项项通用样式 */
+/* 单个选项通用样式 */
 .deepseek-option-item {
     display: flex;
     align-items: center;
@@ -444,6 +450,7 @@ body {
     font-family: 'Inter', sans-serif;
     letter-spacing: 0.025em;
 }
+/* 联网搜索开关样式 */
 
 /* 教程链接样式 */
 .deepseek-tutorial-link a {
@@ -460,6 +467,7 @@ body {
     color: #005177;
     text-decoration: none !important;
 }
+/* 教程链接样式 */
 
 /* 智能体应用标题 */
 #deepseek-agent-title::before {
@@ -484,11 +492,11 @@ body {
 
 /* 鼠标悬停效果 */
 #deepseek-agent-title:hover {
-    background: linear-gradient(135deg, #45a049, #1e7b50); /* 悬停时更深的绿色 */
-    transform: scale(1.05); /* 轻微放大 */
+    background: linear-gradient(135deg, #45a049, #1e7b50);
+    transform: scale(1.05);
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
 }
-
+/* 智能体应用标题 */
 
 /* 智能体应用列表样式 */
 .agent-list {
@@ -513,7 +521,7 @@ body {
 }
 
 .agent-item:hover {
-    background: linear-gradient(180deg, #f9f9f9, #ececec); /* 悬停时更柔和的渐变 */
+    background: linear-gradient(180deg, #f9f9f9, #ececec);
     transform: translateY(-2px);
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
 }
@@ -523,14 +531,14 @@ body {
     height: 40px;
     margin-right: 12px;
     border-radius: 50%;
-    object-fit: cover; /* 确保图标填充 */
+    object-fit: cover;
 }
 
 .agent-info {
     flex-grow: 1;
     display: flex;
-    flex-direction: column; /* 标题和描述垂直排列 */
-    justify-content: center; /* 垂直居中 */
+    flex-direction: column;
+    justify-content: center;
     min-width: 0; /* 防止溢出 */
     margin-left: 10px;
 }
@@ -558,7 +566,7 @@ body {
     text-overflow: ellipsis;
 }
 
-/* 智能体应用响应式设计：手机端一行一个 */
+/* 智能体应用响应式：手机端一行一个 */
 @media (max-width: 768px) {
     .agent-list {
         padding: 10px;
@@ -568,24 +576,284 @@ body {
     }
 
     .agent-item {
-        width: 100%; /* 手机端占满宽度 */
+        width: 100%;
         padding: 12px;
     }
 
     .agent-icon {
-        width: 36px; /* 手机端稍小 */
+        width: 36px;
         height: 36px;
         margin-right: 10px;
     }
 
     .agent-name {
-        font-size: 15px; /* 手机端稍大 */
+        font-size: 15px;
     }
 
     .agent-description {
-        font-size: 13px; /* 手机端稍大 */
+        font-size: 13px;
+    }
+
+    .opening-questions {
+        padding: 10px;
+        gap: 6px;
+    }
+
+    .opening-question {
+        max-width: 100%; /* 手机端每行一个 */
+        padding: 8px 14px;
+        font-size: 13px;
     }
 }
+/* 智能体应用列表样式 */
+/* 智能体应用对话页面 */
+.agent-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    top: 0;
+    z-index: 10;
+    box-sizing: border-box;
+    align-self: center;
+}
+
+.agent-header .agent-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 10px;
+    object-fit: cover;
+}
+
+.agent-header .agent-name {
+    font-size: 18px;
+    font-weight: bold;
+    color: #333;
+}
+/* 智能体应用对话页面 */
+
+/* 开场问题提示和列表样式 */
+.message-bubble.bot.prompt-hint {
+    font-style: italic;
+    color: #666;
+    margin-top: 10px;
+}
+
+.opening-questions {
+    margin-top: 15px;
+    padding: 12px;
+    display: flex;
+    flex-wrap: wrap; /* 允许换行 */
+    gap: 8px; /* 元素间距 */
+    justify-content: flex-start; /* 左对齐 */
+}
+
+.opening-question {
+    padding: 10px 16px;
+    background: linear-gradient(90deg, #4a90e2, #357ab8);
+    color: #fff;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    white-space: nowrap; /* 防止换行 */
+    overflow: hidden;
+    text-overflow: ellipsis; /* 超出部分显示省略号 */
+    max-width: calc(33.33% - 8px); /* 每行最多3个，减去间距 */
+}
+
+.opening-question:hover {
+    background: linear-gradient(90deg, #357ab8, #2a5d8c);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* 响应式手机端每行一个 */
+@media (max-width: 768px) {
+    .opening-questions {
+        padding: 10px;
+        gap: 6px;
+    }
+
+    .opening-question {
+        max-width: 100%;
+        padding: 8px 14px;
+        font-size: 13px;
+    }
+}
+/* 开场问题提示和列表样式 */
+
+/* 未登录提示遮罩层 */
+.deepseek-login-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 16px;
+    font-weight: bold;
+    color: #ff0000;
+    cursor: not-allowed;
+    z-index: 999;
+}
+
+/* 自定义错误提示框样式 */
+.custom-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 20px;
+    border-radius: 5px;
+    color: #fff;
+    font-size: 14px;
+    z-index: 1000;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 200px;
+    max-width: 400px;
+    opacity: 0;
+    animation: fadeIn 0.3s ease forwards;
+}
+
+/* 成功提示框 */
+.custom-notification.success {
+    background-color: #28a745; /* 绿色 */
+}
+
+/* 错误提示框 */
+.custom-notification.error {
+    background-color: #dc3545; /* 红色 */
+}
+
+/* 关闭按钮 */
+.close-notification {
+    margin-left: 10px;
+    font-size: 18px;
+    cursor: pointer;
+    line-height: 1;
+    opacity: 0.8;
+}
+
+.close-notification:hover {
+    opacity: 1;
+}
+
+/* 淡入动画 */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 防止提示框超出屏幕宽度 */
+@media (max-width: 480px) {
+    .custom-notification {
+        right: 10px;
+        left: 10px;
+        width: auto;
+    }
+}
+/* 自定义错误提示框样式 */
+
+/* 智能体应用清除对话样式 */
+#clear-conversation-container {
+    text-align: center;
+    padding: 10px 0;
+    margin-left: 20px;
+    margin-right: 20px;
+}
+
+#clear-conversation-button {
+    background: #666;
+    color: #fff;
+    border: none;
+    padding: 2px 5px;
+    border-radius: 4px;
+    cursor: pointer;
+    width: 100px;
+    text-align: center;
+}
+
+#clear-conversation-button:hover {
+    background: #cc0000;
+}
+
+.confirmation-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+}
+
+.confirmation-dialog {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    max-width: 90%;
+    width: 350px;
+}
+
+.dialog-content {
+    text-align: center;
+}
+
+.dialog-content p {
+    margin-bottom: 20px;
+    color: #333;
+    font-size: 16px;
+}
+
+.dialog-content .confirm-clear,
+.dialog-content .cancel-clear {
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-right: 10px;
+}
+
+.dialog-content .confirm-clear {
+    background: #0073aa;
+    color: #fff;
+}
+
+.dialog-content .confirm-clear:hover {
+    background: #005a87;
+}
+
+.dialog-content .cancel-clear {
+    background: #ccc;
+    color: #333;
+}
+
+.dialog-content .cancel-clear:hover {
+    background: #999;
+}
+/* 清除对话样式 */
 
 /* 响应式优化 */
 @media (max-width: 768px) {

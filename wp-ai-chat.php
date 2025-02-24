@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 3.5
+Version: 3.6
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -58,9 +58,9 @@ function deepseek_create_agent_table() {
 }
 register_activation_hook(__FILE__, 'deepseek_create_agent_table');
 
-require_once plugin_dir_path(__FILE__) . 'wpaitranslate.php'; //翻译语音
-require_once plugin_dir_path(__FILE__) . 'wpaippt.php'; //ppt
-require_once plugin_dir_path(__FILE__) . 'wpaidashscope.php'; //智能体应用
+require_once plugin_dir_path(__FILE__) . 'wpaitranslate.php';
+require_once plugin_dir_path(__FILE__) . 'wpaippt.php';
+require_once plugin_dir_path(__FILE__) . 'wpaidashscope.php';
 
 // 插件列表页面添加设置入口
 function deepseek_add_settings_link($links) {
@@ -214,6 +214,7 @@ function deepseek_register_settings() {
     register_setting('deepseek_chat_options_group', 'enable_keyword_detection'); // 启用关键词检测
     register_setting('deepseek_chat_options_group', 'keyword_list'); // 违规关键词列表
     register_setting('deepseek_chat_options_group', 'enable_intelligent_agent'); // 启用智能体应用
+    register_setting('deepseek_chat_options_group', 'deepseek_login_prompt'); // 未登录提示
     //自定义按钮位置设置（右边距和底边距）    
     register_setting('deepseek_chat_options_group', 'ai_helper_right');
     register_setting('deepseek_chat_options_group', 'ai_helper_bottom');
@@ -300,9 +301,18 @@ function deepseek_register_settings() {
     
     // 助手图标链接设置
     add_settings_field('ai_helper_icon', 'AI助手图标链接', 'ai_helper_icon_callback', 'deepseek-chat', 'deepseek_main_section');    
+
+    // 未登录提示文字
+    add_settings_field('deepseek_login_prompt', '未登录提示文字', 'deepseek_login_prompt_callback', 'deepseek-chat', 'deepseek_main_section');
     
 }
 add_action('admin_init', 'deepseek_register_settings');
+
+// 未登录提示文字输入框回调函数
+function deepseek_login_prompt_callback() {
+    $login_prompt = get_option('deepseek_login_prompt', '请先登录才能使用Ai对话功能');
+    echo '<input type="text" name="deepseek_login_prompt" value="' . esc_attr($login_prompt) . '" style="width: 500px;" />';
+}
 
 // 启用智能体应用回调函数
 function enable_intelligent_agent_callback() {
@@ -826,115 +836,155 @@ add_action('wp_enqueue_scripts', 'deepseek_enqueue_assets');
 
 
 // 对话 开始
-// 添加对话页面的短代码
 function deepseek_chat_shortcode() {
     global $wpdb;
     $table_name = $wpdb->prefix . 'deepseek_chat_logs';
-    $user_id = get_current_user_id();
+    $user_id    = get_current_user_id();
+
+    $history = array();
+    if ( is_user_logged_in() ) {
+        $history = $wpdb->get_results( 
+            $wpdb->prepare(
+                "SELECT * FROM $table_name 
+                 WHERE user_id = %d 
+                 GROUP BY conversation_id 
+                 ORDER BY created_at DESC",
+                $user_id
+            ) 
+        );
+    }
 
     ob_start();
-    if (!is_user_logged_in()) {
-        echo '<div id="deepseek-chat-container">';
-        echo '<div class="deepseek-login-prompt">请先登录才能使用Ai对话功能。</div>';
-        echo '</div>';
-    } else {
-        // 加载历史记录
-        $history = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM $table_name WHERE user_id = %d GROUP BY conversation_id ORDER BY created_at DESC",
-            $user_id
-        ));
-        ?>
-<div id="deepseek-chat-container">
-    <!-- 历史对话框 -->
-    <div id="deepseek-chat-history">
-        <button id="deepseek-new-chat">开启新对话</button>
-        <?php if (get_option('enable_intelligent_agent', '0') == '1'): ?>
-            <h3 id="deepseek-agent-title" style="cursor: pointer;">智能体应用</h3>
-        <?php endif; ?>
-        <ul>
-            <?php if (!empty($history)) : ?>
-                <?php foreach ($history as $log) : ?>
-                    <li data-conversation-id="<?php echo $log->conversation_id; ?>">
-                        <span class="deepseek-chat-title">
-                           <?php 
-                               $title = mb_strlen($log->conversation_title, 'UTF-8') > 6 
-                                   ? mb_substr($log->conversation_title, 0, 6, 'UTF-8') . '...' 
-                                   : $log->conversation_title;
-                               echo esc_html($title);
-                              ?>
-                           </span>
-                        <button class="deepseek-delete-log" data-conversation-id="<?php echo $log->conversation_id; ?>">删除</button>
-                    </li>
-                <?php endforeach; ?>
+    ?>
+    <div id="deepseek-chat-container">
+        <!-- 历史记录区域 -->
+        <div id="deepseek-chat-history">
+            <?php if ( is_user_logged_in() ): ?>
+                <button id="deepseek-new-chat">开启新对话</button>
+                <?php if ( get_option('enable_intelligent_agent', '0') == '1' ): ?>
+                    <h3 id="deepseek-agent-title" style="cursor: pointer;">智能体应用</h3>
+                <?php endif; ?>
+                <ul>
+                    <?php if ( ! empty($history) ) : ?>
+                        <?php foreach ( $history as $log ) : ?>
+                            <li data-conversation-id="<?php echo $log->conversation_id; ?>">
+                                <span class="deepseek-chat-title">
+                                    <?php 
+                                        $title = mb_strlen($log->conversation_title, 'UTF-8') > 6 
+                                            ? mb_substr($log->conversation_title, 0, 6, 'UTF-8') . '...' 
+                                            : $log->conversation_title;
+                                        echo esc_html($title);
+                                    ?>
+                                </span>
+                                <button class="deepseek-delete-log" data-conversation-id="<?php echo $log->conversation_id; ?>">删除</button>
+                            </li>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </ul>
+            <?php else: ?>
+                <p>未登录，暂无历史记录</p>
             <?php endif; ?>
-        </ul>    
-    </div>
-    <!-- 主对话框 -->
-    <div id="deepseek-chat-main">
-        <!-- 消息框 -->
-        <div id="deepseek-chat-messages">         
-            <!-- 初始为空，点击历史记录后动态加载 -->
-            <div class="message-bubble bot" id="chatbot-prompt">你好，我可以帮你写作、写文案、翻译，有问题请问我~</div>
-            <!-- 自定义提示词面板 -->
-            <?php
-            $custom_prompts = get_option('deepseek_custom_prompts', '');
-            if (!empty($custom_prompts)) {
-                $prompts = array_filter(array_map('trim', explode("\n", $custom_prompts)));
-                if (!empty($prompts)) {
-                    echo '<div id="deepseek-custom-prompts">';
-                    foreach ($prompts as $prompt) {
-                        echo '<span class="deepseek-prompt">' . esc_html($prompt) . '</span>';
+        </div>
+
+        <!-- 主对话区域 -->
+        <div id="deepseek-chat-main">
+            <!-- 消息显示区域 -->
+            <div id="deepseek-chat-messages">
+                <div class="message-bubble bot" id="chatbot-prompt">你好，我可以帮你写作、写文案、翻译，有问题请问我~</div>
+                <?php
+                $custom_prompts = get_option('deepseek_custom_prompts', '');
+                if ( ! empty($custom_prompts) ) {
+                    $prompts = array_filter( array_map('trim', explode("\n", $custom_prompts)) );
+                    if ( ! empty($prompts) ) {
+                        echo '<div id="deepseek-custom-prompts">';
+                        foreach ( $prompts as $prompt ) {
+                            echo '<span class="deepseek-prompt">' . esc_html($prompt) . '</span>';
+                        }
+                        echo '</div>';
                     }
-                    echo '</div>';
                 }
-            }
-            ?>            
-        </div>
-        <!-- 输入框和发送按钮 -->
-        <div id="deepseek-chat-input-container">
-            <textarea id="deepseek-chat-input" placeholder="输入你的消息..." rows="4"></textarea>
-            <button id="deepseek-chat-send">发送</button>
-        </div>
-        <div id="keyword-error-message" style="color: red; display: none; margin-top: 5px; margin-left: 10px;">
-            内容包含违规关键词，小助手无法正常处理，请刷新网页修改之后再试。
-        </div>
-        <div id="deepseek-options-bar">
-                        <?php if (get_option('qwen_enable_search') && get_option('chat_interface_choice') === 'qwen'): ?>
-                            <div class="deepseek-option-item deepseek-search-toggle">
-                                <label class="switch">
-                                    <input type="checkbox" id="enable-search">
-                                    <span class="slider round"></span>
-                                </label>
-                                <span>联网搜索</span>
-                            </div>
-                        <?php endif; ?>
-                        <?php
-                        $tutorial_title = get_option('ai_tutorial_title', '');
-                        $tutorial_url = get_option('ai_tutorial_url', '');
-                        if (!empty($tutorial_title) && !empty($tutorial_url)): ?>
-                            <div class="deepseek-option-item deepseek-tutorial-link">
-                                <a href="<?php echo esc_url($tutorial_url); ?>" target="_blank"><?php echo esc_html($tutorial_title); ?></a>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
+                ?>
             </div>
-            <div id="bottom-description" style="margin-top: 5px; text-align: center;">内容由Ai自动生成，不代表本站观点。</div>
-<script type="text/javascript">
-document.addEventListener('DOMContentLoaded', function() {
-    const input = document.getElementById('deepseek-chat-input');
-    const sendButton = document.getElementById('deepseek-chat-send');
-    // 监听回车键
-    input.addEventListener('keypress', function(event) {
-        if (event.key === 'Enter' && !event.shiftKey) { // 检测回车键且不含Shift
-            event.preventDefault(); // 防止换行
-            sendButton.click(); // 触发发送按钮的点击事件
+
+            <!-- 清除对话按钮 -->
+            <div id="clear-conversation-container">
+                <button id="clear-conversation-button" style="display: none;">清除对话</button>
+            </div>
+
+            <!-- 输入区域 -->
+            <div id="deepseek-chat-input-container">
+                <?php if ( is_user_logged_in() ) : ?>
+                    <textarea id="deepseek-chat-input" placeholder="输入你的消息..." rows="4"></textarea>
+                    <button id="deepseek-chat-send">发送</button>
+                <?php else: 
+                    $login_prompt = get_option('deepseek_login_prompt', '请先登录才能使用Ai对话功能');
+                ?>
+                    <div class="deepseek-login-overlay">
+                        <?php echo esc_html($login_prompt); ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <!-- 违规关键词提示 -->
+            <div id="keyword-error-message" style="color: red; display: none; margin-top: 5px; margin-left: 10px;">
+                内容包含违规关键词，小助手无法正常处理，请刷新网页修改之后再试。
+            </div>
+
+            <!-- 功能选项栏 -->
+            <div id="deepseek-options-bar">
+                <?php if ( get_option('qwen_enable_search') && get_option('chat_interface_choice') === 'qwen' ): ?>
+                    <div class="deepseek-option-item deepseek-search-toggle">
+                        <label class="switch">
+                            <input type="checkbox" id="enable-search">
+                            <span class="slider round"></span>
+                        </label>
+                        <span>联网搜索</span>
+                    </div>
+                <?php endif; ?>
+
+                <?php
+                $tutorial_title = get_option('ai_tutorial_title', '');
+                $tutorial_url   = get_option('ai_tutorial_url', '');
+                if ( ! empty($tutorial_title) && ! empty($tutorial_url) ): ?>
+                    <div class="deepseek-option-item deepseek-tutorial-link">
+                        <a href="<?php echo esc_url($tutorial_url); ?>" target="_blank">
+                            <?php echo esc_html($tutorial_title); ?>
+                        </a>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部提示 -->
+    <div id="bottom-description" style="margin-top: 5px; text-align: center;">
+        内容由Ai自动生成，不代表本站观点。
+    </div>
+
+    <!-- 回车发送的JS -->
+    <script type="text/javascript">
+    document.addEventListener('DOMContentLoaded', function() {
+        const input = document.getElementById('deepseek-chat-input');
+        const sendButton = document.getElementById('deepseek-chat-send');
+        if (input && sendButton && !sendButton.disabled) {
+            input.addEventListener('keypress', function(event) {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    sendButton.click();
+                }
+            });
+        }
+
+        // 清除对话按钮点击事件
+        const clearButton = document.getElementById('clear-conversation-button');
+        if (clearButton) {
+            clearButton.addEventListener('click', function() {
+                showClearConfirmation(document.getElementById('deepseek-chat-messages'));
+            });
         }
     });
-});
-</script>                    
-        <?php
-    }
+    </script>
+    <?php
     return ob_get_clean();
 }
 add_shortcode('deepseek_chat', 'deepseek_chat_shortcode');

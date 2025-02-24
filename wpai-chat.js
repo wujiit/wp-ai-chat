@@ -21,6 +21,7 @@ var currentPage = 'home';         // 当前页面状态：'home', 'conversation'
 function setCurrentPage(page) {
     currentPage = page;
     localStorage.setItem('currentPage', page);
+    toggleClearButtonVisibility(); // 更新按钮显示状态
 }
 
 // 设置普通对话 ID
@@ -504,17 +505,29 @@ function loadChatLog(conversationId) {
         if (data.success) {
             var messagesContainer = document.getElementById('deepseek-chat-messages');
             messagesContainer.innerHTML = '';
+            const fragment = document.createDocumentFragment();
             data.messages.forEach(message => {
-                messagesContainer.innerHTML += '<div class="message-bubble user">' + message.message + '</div>';
+                const userMessage = document.createElement('div');
+                userMessage.classList.add('message-bubble', 'user');
+                userMessage.textContent = message.message;
+                fragment.appendChild(userMessage);
+
                 const botMessageElement = document.createElement('div');
                 botMessageElement.classList.add('message-bubble', 'bot');
                 botMessageElement.innerHTML = convertMarkdownToHTML(message.response);
-                messagesContainer.appendChild(botMessageElement);
+                fragment.appendChild(botMessageElement);
                 addCopyButtonsToPreTags(botMessageElement);
                 addVoicePlayback(botMessageElement, message.response);
             });
+            messagesContainer.appendChild(fragment);
             setCurrentConversationId(conversationId);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
+    })
+    .catch(error => {
+        console.error('加载对话历史失败:', error);
+        var messagesContainer = document.getElementById('deepseek-chat-messages');
+        messagesContainer.innerHTML = '<div class="message-bubble bot">加载对话历史失败，请稍后重试</div>';
     });
 }
 
@@ -637,16 +650,133 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// 显示清除确认框
+function showClearConfirmation(container) {
+    const overlay = document.createElement('div');
+    overlay.classList.add('confirmation-overlay');
+
+    const confirmationDialog = document.createElement('div');
+    confirmationDialog.classList.add('confirmation-dialog');
+    confirmationDialog.innerHTML = `
+        <div class="dialog-content">
+            <p>确定要清除对话吗？删除后不可恢复！</p>
+            <button class="confirm-clear">确认</button>
+            <button class="cancel-clear">取消</button>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+    document.body.appendChild(confirmationDialog);
+
+    confirmationDialog.querySelector('.confirm-clear').addEventListener('click', function() {
+        clearConversation(container);
+        overlay.remove();
+        confirmationDialog.remove();
+    });
+
+    confirmationDialog.querySelector('.cancel-clear').addEventListener('click', function() {
+        overlay.remove();
+        confirmationDialog.remove();
+    });
+
+    overlay.addEventListener('click', function() {
+        overlay.remove();
+        confirmationDialog.remove();
+    });
+}
+
+// 清除对话
+// 显示自定义提示框
+function showCustomNotification(message, type = 'error') {
+    // 创建提示框容器
+    const notification = document.createElement('div');
+    notification.className = `custom-notification ${type}`;
+    notification.textContent = message;
+
+    // 添加关闭按钮
+    const closeButton = document.createElement('span');
+    closeButton.className = 'close-notification';
+    closeButton.innerHTML = '&times;';
+    closeButton.onclick = () => notification.remove();
+    notification.appendChild(closeButton);
+
+    // 添加到页面
+    document.body.appendChild(notification);
+
+    // 自动消失
+    setTimeout(() => {
+        notification.remove();
+    }, 2000); // 2秒后自动消失
+}
+
+// 清除对话
+function clearConversation(container) {
+    const appId = currentAppId;
+    if (!appId) {
+        showCustomNotification('未选择智能体应用，无法清除对话');
+        return;
+    }
+
+    fetch(adminAjaxUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'action=deepseek_clear_agent_conversation&app_id=' + encodeURIComponent(appId)
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('网络响应错误: ' + response.status);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            container.innerHTML = '';
+            loadAgentChat(appId); // 重新加载当前智能体对话页面
+            showCustomNotification('对话记录清除成功', 'success');
+            console.log('对话记录清除成功');
+        } else {
+            showCustomNotification('清除对话失败: ' + (data.message || '未知错误'));
+        }
+    })
+    .catch(error => {
+        console.error('清除对话请求失败:', error);
+        showCustomNotification('网络错误，请稍后重试');
+    });
+}
+
 // 加载智能体对话历史
 function loadAgentChat(appId) {
-    fetch(adminAjaxUrl + '?action=deepseek_load_agent_log&app_id=' + appId)
-    .then(response => response.json())
-    .then(data => {
-        var messagesContainer = document.getElementById('deepseek-chat-messages');
-        messagesContainer.innerHTML = '';
-        if (data.success && data.data && data.data.messages && Array.isArray(data.data.messages)) {
-            if (data.data.messages.length > 0) {
-                data.data.messages.forEach(message => {
+    var messagesContainer = document.getElementById('deepseek-chat-messages');
+    messagesContainer.innerHTML = '';
+
+    Promise.all([
+        fetch(adminAjaxUrl + '?action=deepseek_load_agent_log&app_id=' + appId).then(response => response.json()),
+        fetch(adminAjaxUrl + '?action=deepseek_get_agents').then(response => response.json())
+    ])
+    .then(([chatData, agentData]) => {
+        let agent = null;
+        if (agentData.success && agentData.data && agentData.data.agents) {
+            agent = agentData.data.agents.find(a => a.app_id === appId);
+            if (agent) {
+                var headerContainer = document.createElement('div');
+                headerContainer.className = 'agent-header';
+                headerContainer.innerHTML = `
+                    <img src="${agent.icon || ''}" alt="${agent.name}" class="agent-icon">
+                    <span class="agent-name">${agent.name}</span>
+                `;
+                messagesContainer.appendChild(headerContainer);
+            } else {
+                messagesContainer.innerHTML += '<div class="message-bubble bot">未找到该智能体详情</div>';
+            }
+        } else {
+            messagesContainer.innerHTML += '<div class="message-bubble bot">加载智能体详情失败，请检查配置</div>';
+        }
+
+        if (chatData.success && chatData.data && chatData.data.messages && Array.isArray(chatData.data.messages)) {
+            if (chatData.data.messages.length > 0) {
+                chatData.data.messages.forEach(message => {
                     if (message.message) {
                         messagesContainer.innerHTML += '<div class="message-bubble user">' + message.message + '</div>';
                     }
@@ -660,11 +790,31 @@ function loadAgentChat(appId) {
                     }
                 });
             } else {
-                messagesContainer.innerHTML = '<div class="message-bubble bot">欢迎使用智能体应用对话，请输入消息开始。</div>';
+                messagesContainer.innerHTML += '<div class="message-bubble bot">欢迎使用智能体应用对话，请输入消息开始。</div>';
+                if (agent && agent.opening_questions && agent.opening_questions.length > 0) {
+                    var promptHint = document.createElement('div');
+                    promptHint.className = 'message-bubble bot prompt-hint';
+                    promptHint.textContent = '你可以这样问我';
+                    messagesContainer.appendChild(promptHint);
+
+                    var questionsContainer = document.createElement('div');
+                    questionsContainer.className = 'opening-questions';
+                    agent.opening_questions.forEach(question => {
+                        var questionItem = document.createElement('div');
+                        questionItem.className = 'opening-question';
+                        questionItem.textContent = question;
+                        questionItem.addEventListener('click', function() {
+                            sendAgentMessage(question, appId);
+                        });
+                        questionsContainer.appendChild(questionItem);
+                    });
+                    messagesContainer.appendChild(questionsContainer);
+                }
             }
         } else {
-            messagesContainer.innerHTML = '<div class="message-bubble bot">加载对话历史失败，请稍后重试</div>';
+            messagesContainer.innerHTML += '<div class="message-bubble bot">加载对话历史失败，请稍后重试</div>';
         }
+
         setCurrentAppId(appId);
         showingAgents = false;
         localStorage.setItem('showingAgents', 'false');
@@ -672,8 +822,7 @@ function loadAgentChat(appId) {
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     })
     .catch(error => {
-        console.error('加载智能体应用对话失败:', error);
-        var messagesContainer = document.getElementById('deepseek-chat-messages');
+        console.error('加载智能体对话或详情失败:', error);
         messagesContainer.innerHTML = '<div class="message-bubble bot">网络错误，请稍后重试</div>';
     });
 }
@@ -681,11 +830,35 @@ function loadAgentChat(appId) {
 // 发送智能体消息
 function sendAgentMessage(message, appId) {
     var messagesContainer = document.getElementById('deepseek-chat-messages');
+    
+    // 添加智能体头部信息
+    if (!messagesContainer.querySelector('.agent-header')) {
+        fetch(adminAjaxUrl + '?action=deepseek_get_agents')
+        .then(response => response.json())
+        .then(agentData => {
+            if (agentData.success && agentData.data && agentData.data.agents) {
+                const agent = agentData.data.agents.find(a => a.app_id === appId);
+                if (agent) {
+                    var headerContainer = document.createElement('div');
+                    headerContainer.className = 'agent-header';
+                    headerContainer.innerHTML = `
+                        <img src="${agent.icon || ''}" alt="${agent.name}" class="agent-icon">
+                        <span class="agent-name">${agent.name}</span>
+                    `;
+                    messagesContainer.insertBefore(headerContainer, messagesContainer.firstChild);
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight; // 确保头部添加后滚动到底部
+                }
+            }
+        });
+    }
+
+    // 添加用户消息
     messagesContainer.innerHTML += '<div class="message-bubble user">' + message + '</div>';
     var botMessageContainer = document.createElement('div');
     botMessageContainer.classList.add('message-bubble', 'bot');
     botMessageContainer.textContent = '智能体应用正在处理...';
     messagesContainer.appendChild(botMessageContainer);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight; // 用户消息添加后立即滚动到底部
 
     const agentUrl = restUrl.replace('send-message', 'send-agent-message');
 
@@ -715,9 +888,7 @@ function sendAgentMessage(message, appId) {
                     botMessageContainer.innerHTML = convertMarkdownToHTML(botReply);
                     addCopyButtonsToPreTags(botMessageContainer);
                     addVoicePlayback(botMessageContainer, botReply);
-                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                    console.log('智能体应用对话完成:', botReply);
-                    setTimeout(() => loadAgentChat(appId), 1000);
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight; // 完成后确保滚动到底部
                     document.getElementById('deepseek-chat-input').value = '';
                     return;
                 }
@@ -732,12 +903,14 @@ function sendAgentMessage(message, appId) {
                             const jsonData = JSON.parse(dataPart);
                             if (jsonData.error) {
                                 botMessageContainer.textContent = '错误: ' + jsonData.error;
+                                messagesContainer.scrollTop = messagesContainer.scrollHeight;
                                 return;
                             }
                             if (jsonData.text) {
                                 botReply += jsonData.text;
                                 botMessageContainer.innerHTML = convertMarkdownToHTML(botReply);
-                                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                                // 每次更新内容时立即滚动到底部
+                                botMessageContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
                             }
                         } catch (e) {
                             console.error('解析 SSE 数据错误:', e, '原始数据:', dataPart);
@@ -752,5 +925,20 @@ function sendAgentMessage(message, appId) {
     .catch(error => {
         console.error('发送智能体应用消息失败:', error);
         botMessageContainer.textContent = '网络错误，请稍后重试';
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
     });
 }
+
+// 控制清除对话按钮的显示
+function toggleClearButtonVisibility() {
+    const clearButton = document.getElementById('clear-conversation-button');
+    if (clearButton) {
+        clearButton.style.display = currentPage === 'agent' ? 'block' : 'none';
+    }
+}
+
+
+// 在页面加载时初始化按钮显示
+window.addEventListener('load', function() {
+    toggleClearButtonVisibility();
+});
