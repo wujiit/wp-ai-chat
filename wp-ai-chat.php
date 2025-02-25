@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 3.6
+Version: 3.7
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -1727,6 +1727,9 @@ function deepseek_render_article_generator_page() {
             }
             ?>
 
+            <p><strong>文章标签：</strong></p>
+            <input type="text" name="post_tags" id="post_tags" style="width: 500px;" placeholder="多个标签用英文逗号分隔，如：科技,智能,教程" />
+
             <p><strong>选择接口(模型需要支持长文本)：</strong></p>
             <?php
             $interface_choice = get_option('chat_interface_choice', 'deepseek');
@@ -1821,12 +1824,14 @@ function deepseek_render_article_generator_page() {
         var post_title = document.getElementById('post_title').value;
         var post_content = tinymce.get('post_content').getContent();
         var category_id = document.querySelector('select[name="category_id"]').value;
+        var post_tags = document.getElementById('post_tags').value;
 
         var data = {
             action: 'publish_article_ajax',
             post_title: post_title,
             post_content: post_content,
-            category_id: category_id
+            category_id: category_id,
+            post_tags: post_tags
         };
 
         jQuery.post(ajaxurl, data, function(response) {
@@ -1965,12 +1970,13 @@ function deepseek_publish_article_ajax() {
     $post_title = sanitize_text_field($_POST['post_title']);
     $post_content = wp_kses_post($_POST['post_content']); // 确保内容安全
     $category_id = intval($_POST['category_id']);
+    $post_tags = isset($_POST['post_tags']) ? sanitize_text_field($_POST['post_tags']) : '';
 
     // 创建新的文章
     $post_data = array(
         'post_title'    => $post_title,
         'post_content'  => $post_content,
-        'post_status'   => 'publish', // 设置为发布状态
+        'post_status'   => 'publish',
         'post_category' => array($category_id),
         'post_author'   => get_current_user_id(),
     );
@@ -1979,6 +1985,11 @@ function deepseek_publish_article_ajax() {
     $post_id = wp_insert_post($post_data);
 
     if ($post_id) {
+        // 处理标签
+        if (!empty($post_tags)) {
+            $tags_array = array_map('trim', explode(',', $post_tags));
+            wp_set_post_tags($post_id, $tags_array, true);
+        }
         wp_send_json_success(array('message' => '文章已成功发布!', 'post_id' => $post_id));
     } else {
         wp_send_json_error(array('message' => '文章发布失败'));

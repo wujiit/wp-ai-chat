@@ -45,12 +45,11 @@ function deepseek_send_agent_message(WP_REST_Request $request) {
     $app_id = sanitize_text_field($request->get_param('app_id'));
     $session_id = $request->get_param('session_id');
 
-    // 获取智能体配置
     $agents = get_option('deepseek_agents', []);
     $agent = array_filter($agents, function ($a) use ($app_id) {
         return $a['app_id'] === $app_id;
     });
-    $agent = reset($agent); // 获取第一个匹配的智能体
+    $agent = reset($agent);
     if (!$agent) {
         header('Content-Type: text/event-stream');
         echo "data: " . json_encode(['error' => '智能体未找到']) . "\n\n";
@@ -59,7 +58,6 @@ function deepseek_send_agent_message(WP_REST_Request $request) {
     }
     $provider = $agent['provider'];
 
-    // 保存用户消息
     $wpdb->insert($table_name, [
         'user_id' => $user_id,
         'app_id' => $app_id,
@@ -72,9 +70,8 @@ function deepseek_send_agent_message(WP_REST_Request $request) {
         error_log("保存用户消息失败: " . $wpdb->last_error);
     }
 
-    // 清空缓冲区，设置流式响应头
     while (ob_get_level() > 0) {
-        ob_end_clean(); // 确保清除所有现有的输出缓冲
+        ob_end_clean();
     }
     ini_set('output_buffering', 'off');
     ini_set('zlib.output_compression', false);
@@ -86,7 +83,6 @@ function deepseek_send_agent_message(WP_REST_Request $request) {
     $full_response = '';
     $current_session_id = $session_id;
 
-    // 根据提供商处理请求
     if ($provider === 'ali') {
         $api_key = get_option('ali_agent_api_key');
         if (empty($api_key)) {
@@ -109,33 +105,10 @@ function deepseek_send_agent_message(WP_REST_Request $request) {
             $body['input']['session_id'] = $session_id;
         }
         $body = json_encode($body);
-
-        $write_function = function ($ch, $data) use (&$full_response, &$current_session_id) {
-            $lines = explode("\n", $data);
-            foreach ($lines as $line) {
-                $line = trim($line);
-                if (strpos($line, 'data:') === 0) {
-                    $json_str = trim(substr($line, 5));
-                    if ($json_str !== '[DONE]') {
-                        $json_data = json_decode($json_str, true);
-                        if (isset($json_data['output']['text']) && !empty($json_data['output']['text'])) {
-                            $full_response .= $json_data['output']['text'];
-                            echo "data: " . json_encode(['text' => $json_data['output']['text']]) . "\n\n";
-                        }
-                        if (isset($json_data['output']['session_id'])) {
-                            $current_session_id = $json_data['output']['session_id'];
-                        }
-                    }
-                }
-            }
-            // 如果ob_flush()也可以不过要先判断
-            flush();
-            return strlen($data);
-        };
     } elseif ($provider === 'tencent') {
-        $tencent_token = get_option('tencent_token');
+        $tencent_token = $agent['token'] ?? '';
         if (empty($tencent_token)) {
-            echo "data: " . json_encode(['error' => '腾讯Token未配置']) . "\n\n";
+            echo "data: " . json_encode(['error' => '此腾讯智能体Token未配置']) . "\n\n";
             flush();
             exit;
         }
@@ -146,8 +119,8 @@ function deepseek_send_agent_message(WP_REST_Request $request) {
             "Authorization: Bearer $tencent_token"
         ];
         $body = json_encode([
-            "assistant_id" => $app_id, // 腾讯使用assistant_id作为app_id
-            "user_id" => strval($user_id), // 用户ID转为字符串
+            "assistant_id" => $app_id,
+            "user_id" => strval($user_id),
             "stream" => true,
             "messages" => [
                 [
@@ -161,32 +134,116 @@ function deepseek_send_agent_message(WP_REST_Request $request) {
                 ]
             ]
         ]);
-
-        $write_function = function ($ch, $data) use (&$full_response) {
-            $lines = explode("\n", $data);
-            foreach ($lines as $line) {
-                $line = trim($line);
-                if (strpos($line, 'data:') === 0) {
-                    $json_str = trim(substr($line, 5));
-                    if ($json_str !== '[DONE]') {
-                        $json_data = json_decode($json_str, true);
-                        if (isset($json_data['choices'][0]['delta']['role']) && $json_data['choices'][0]['delta']['role'] === 'assistant' && !empty($json_data['choices'][0]['delta']['content'])) {
-                            $full_response .= $json_data['choices'][0]['delta']['content'];
-                            echo "data: " . json_encode(['text' => $json_data['choices'][0]['delta']['content']]) . "\n\n";
-                        }
-                    }
-                }
-            }
+    } elseif ($provider === 'coze') {
+        $access_token = get_option('coze_access_token');
+        $expiry = get_option('coze_access_token_expiry');
+        if (empty($access_token)) {
+            echo "data: " . json_encode(['error' => '扣子平台Access Token未配置']) . "\n\n";
             flush();
-            return strlen($data);
-        };
+            exit;
+        }
+        if ($expiry && strtotime($expiry) < time()) {
+            echo "data: " . json_encode(['error' => '扣子平台Access Token已过期，请更新']) . "\n\n";
+            flush();
+            exit;
+        }
+        $url = "https://api.coze.cn/v3/chat";
+        $headers = [
+            "Authorization: Bearer $access_token",
+            "Content-Type: application/json"
+        ];
+        $body = [
+            'bot_id' => $app_id,
+            'user_id' => strval($user_id),
+            'stream' => true,
+            'auto_save_history' => true,
+            'additional_messages' => [
+                [
+                    'role' => 'user',
+                    'content' => $message,
+                    'content_type' => 'text'
+                ]
+            ]
+        ];
+        if ($session_id) {
+            $body['conversation_id'] = $session_id;
+        }
+        $body = json_encode($body);
     } else {
         echo "data: " . json_encode(['error' => '未知的智能体提供商']) . "\n\n";
         flush();
         exit;
     }
 
-    // 执行cURL请求
+    $write_function = function ($ch, $data) use (&$full_response, &$current_session_id, $provider) {
+        error_log("Raw response data: " . $data);
+        
+        $lines = explode("\n", $data);
+        $should_flush = false;
+        
+        foreach ($lines as $line) {
+            $line = trim($line);
+            
+            if ($provider === 'coze' && strpos($line, 'event:') === 0) {
+                $event = trim(substr($line, 6));
+                $next_line_is_data = true;
+                continue;
+            }
+            
+            if ($line && strpos($line, 'data:') === 0) {
+                $json_str = trim(substr($line, 5));
+                error_log("Parsed line: " . $json_str);
+                
+                if ($json_str === '[DONE]') {
+                    continue;
+                }
+                
+                $json_data = json_decode($json_str, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    error_log("JSON decode error: " . json_last_error_msg());
+                    continue;
+                }
+
+                if ($provider === 'ali') {
+                    if (isset($json_data['output']['text']) && !empty($json_data['output']['text'])) {
+                        $full_response .= $json_data['output']['text'];
+                        echo "data: " . json_encode(['text' => $json_data['output']['text']]) . "\n\n";
+                        $should_flush = true;
+                    }
+                    if (isset($json_data['output']['session_id'])) {
+                        $current_session_id = $json_data['output']['session_id'];
+                    }
+                } elseif ($provider === 'tencent') {
+                    if (isset($json_data['choices'][0]['delta']['role']) && 
+                        $json_data['choices'][0]['delta']['role'] === 'assistant' && 
+                        !empty($json_data['choices'][0]['delta']['content'])) {
+                        $full_response .= $json_data['choices'][0]['delta']['content'];
+                        echo "data: " . json_encode(['text' => $json_data['choices'][0]['delta']['content']]) . "\n\n";
+                        $should_flush = true;
+                    }
+                } elseif ($provider === 'coze') {
+                    if (isset($event) && $event === 'conversation.message.delta' && 
+                        isset($json_data['content']) && !empty($json_data['content']) && 
+                        isset($json_data['role']) && $json_data['role'] === 'assistant' && 
+                        isset($json_data['type']) && $json_data['type'] === 'answer') {
+                        $full_response .= $json_data['content'];
+                        echo "data: " . json_encode(['text' => $json_data['content']]) . "\n\n";
+                        $should_flush = true;
+                    }
+                    if (isset($json_data['conversation_id'])) {
+                        $current_session_id = $json_data['conversation_id'];
+                    }
+                    unset($event);
+                }
+            }
+        }
+        
+        if ($should_flush) {
+            flush();
+        }
+        return strlen($data);
+    };
+
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST, true);
@@ -194,16 +251,25 @@ function deepseek_send_agent_message(WP_REST_Request $request) {
     curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
     curl_setopt($ch, CURLOPT_WRITEFUNCTION, $write_function);
+    curl_setopt($ch, CURLOPT_VERBOSE, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+
+    error_log("Request URL: " . $url);
+    error_log("Request Headers: " . json_encode($headers));
+    error_log("Request Body: " . $body);
 
     $result = curl_exec($ch);
+    
     if ($result === false) {
-        echo "data: " . json_encode(['error' => 'API请求失败: ' . curl_error($ch)]) . "\n\n";
+        $curl_error = curl_error($ch);
+        $curl_errno = curl_errno($ch);
+        error_log("cURL Error ($curl_errno): " . $curl_error);
+        echo "data: " . json_encode(['error' => 'API请求失败: ' . $curl_error]) . "\n\n";
         flush();
     } else {
         echo "data: [DONE]\n\n";
         flush();
 
-        // 保存智能体回复
         if (!empty($full_response)) {
             $wpdb->insert($table_name, [
                 'user_id' => $user_id,
@@ -216,6 +282,10 @@ function deepseek_send_agent_message(WP_REST_Request $request) {
             if ($wpdb->last_error) {
                 error_log("保存智能体回复失败: " . $wpdb->last_error);
             }
+        } else {
+            error_log("No response content received");
+            echo "data: " . json_encode(['error' => '没有收到响应内容']) . "\n\n";
+            flush();
         }
     }
     curl_close($ch);
@@ -224,90 +294,66 @@ function deepseek_send_agent_message(WP_REST_Request $request) {
 
 // 智能体设置页面
 function deepseek_render_agents_page() {
-// 检查是否保存成功
     $saved = isset($_GET['settings-updated']) && $_GET['settings-updated'] === 'true';
     ?>
     <style>
-/* 限制整体容器宽度 */
-.dashscope-wrap {
-    background: #fff;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    margin: 0 auto;
-}
+        .dashscope-wrap {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .dashscope-wrap h1 {
+            font-size: 24px;
+            color: #333;
+        }
+        .dashscope-wrap table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+        }
+        .dashscope-wrap th, .dashscope-wrap td {
+            padding: 10px;
+            width: 150px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        .dashscope-wrap input[type="text"], .dashscope-wrap input[type="url"], .dashscope-wrap textarea, .dashscope-wrap input[type="datetime-local"] {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        #deepseek-agents-table th:nth-child(1), #deepseek-agents-table td:nth-child(1),
+        #deepseek-agents-table th:nth-child(8), #deepseek-agents-table td:nth-child(8) {
+            width: 100px;
+            white-space: nowrap;
+        }
+        .dashscope-wrap button {
+            background: #0073aa;
+            color: #fff;
+            border: none;
+            padding: 8px 12px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .dashscope-wrap button:hover {
+            background: #005a87;
+        }
+        .dashscope-wrap .success-message {
+            display: none;
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #dff0d8;
+            color: #3c763d;
+            border: 1px solid #d6e9c6;
+            border-radius: 4px;
+            text-align: center;
+        }
+    </style>
 
-.dashscope-wrap h1 {
-    font-size: 24px;
-    color: #333;
-}
-
-/* 表格样式 */
-.dashscope-wrap table {
-    width: 100%;
-    border-collapse: collapse;
-    background: #fff;
-}
-
-.dashscope-wrap th,
-.dashscope-wrap td {
-    padding: 10px;
-    border: 1px solid #ddd;
-    text-align: left;
-}
-
-/* 统一input与textarea的样式 */
-.dashscope-wrap input[type="text"],
-.dashscope-wrap input[type="url"],
-.dashscope-wrap textarea {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    box-sizing: border-box;
-}
-
-/* 限制表格中“提供商”（第1列）和“操作”（第7列）的宽度 */
-#deepseek-agents-table th:nth-child(1),
-#deepseek-agents-table td:nth-child(1),
-#deepseek-agents-table th:nth-child(7),
-#deepseek-agents-table td:nth-child(7) {
-    width: 100px; /* 根据需要调整宽度 */
-    white-space: nowrap;
-}
-
-/* 为API Key、Token输入框设置最大宽度 */
-.api-input {
-    max-width: 300px;
-}
-
-/* 按钮样式 */
-.dashscope-wrap button {
-    background: #0073aa;
-    color: #fff;
-    border: none;
-    padding: 8px 12px;
-    cursor: pointer;
-    border-radius: 4px;
-}
-
-.dashscope-wrap button:hover {
-    background: #005a87;
-}
-/* 成功消息样式 */
-.dashscope-wrap .success-message {
-    display: none;
-    margin-top: 15px;
-    padding: 10px;
-    background-color: #dff0d8;
-    color: #3c763d;
-    border: 1px solid #d6e9c6;
-    border-radius: 4px;
-    text-align: center;
-}
-</style>
-
-<div class="dashscope-wrap">
+    <div class="dashscope-wrap">
         <h1>智能体应用管理</h1>
         <form method="post" action="options.php">
             <?php
@@ -317,7 +363,8 @@ function deepseek_render_agents_page() {
             ?>
         </form>
         <div class="success-message" <?php echo $saved ? 'style="display: block;"' : ''; ?>>设置已保存</div>
-        <p>支持阿里和腾讯的普通智能体应用，不支持使用了插件的智能体应用(支持部分阿里智能体应用的插件)，需分别配置API Key和Token。</p>
+        <p>支持阿里、腾讯和扣子平台的智能体应用。阿里API Key就是百炼里面的，腾讯需为每个智能体单独设置Token，扣子的个人访问令牌Token需定期更换。
+            <br>暂时只支持普通对话，部分插件可能也不支持</p>
     </div>
 
     <?php if ($saved) : ?>
@@ -417,13 +464,17 @@ function deepseek_render_agent_logs_page() {
 
                 fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    headers: { 'Content-Type: 'application/x-www-form-urlencoded' },
                     body: 'action=deepseek_delete_agent_log&user_id=' + encodeURIComponent(userId) + '&app_id=' + encodeURIComponent(appId)
                 })
                 .then(response => response.json())
                 .then(data => {
-                    if (data.success) { row.remove(); alert('记录已删除'); } 
-                    else { alert('删除失败: ' + (data.message || '未知错误')); }
+                    if (data.success) { 
+                        row.remove(); 
+                        alert('记录已删除'); 
+                    } else { 
+                        alert('删除失败: ' + (data.message || '未知错误')); 
+                    }
                 })
                 .catch(error => {
                     console.error('删除请求失败:', error);
@@ -438,34 +489,42 @@ function deepseek_render_agent_logs_page() {
 
 // 注册设置
 function deepseek_register_agents_settings() {
-    // 注册选项
     register_setting('deepseek_agents_group', 'ali_agent_api_key', 'sanitize_text_field');
-    register_setting('deepseek_agents_group', 'tencent_token', 'sanitize_text_field');
+    register_setting('deepseek_agents_group', 'coze_access_token', 'sanitize_text_field');
+    register_setting('deepseek_agents_group', 'coze_access_token_expiry', 'deepseek_sanitize_expiry');
     register_setting('deepseek_agents_group', 'deepseek_agents', 'deepseek_sanitize_agents');
 
-    // 添加设置区域
     add_settings_section('deepseek_agents_section', '智能体配置', null, 'deepseek-agents');
-    add_settings_field('ali_agent_api_key', '阿里智能体 API_KEY', 'ali_agent_api_key_callback', 'deepseek-agents', 'deepseek_agents_section');
-    add_settings_field('tencent_token', '腾讯智能体 Token', 'tencent_token_callback', 'deepseek-agents', 'deepseek_agents_section');
+    add_settings_field('ali_agent_api_key', '阿里智能体API_KEY', 'ali_agent_api_key_callback', 'deepseek-agents', 'deepseek_agents_section');
+    add_settings_field('coze_access_token', '扣子访问令牌Token', 'coze_access_token_callback', 'deepseek-agents', 'deepseek_agents_section');
     add_settings_field('deepseek_agents_list', '智能体应用列表', 'deepseek_agents_list_callback', 'deepseek-agents', 'deepseek_agents_section');
 }
 add_action('admin_init', 'deepseek_register_agents_settings');
 
-// 阿里API Key回调
+// 设置回调函数
 function ali_agent_api_key_callback() {
     $api_key = get_option('ali_agent_api_key');
     echo '<input type="text" name="ali_agent_api_key" value="' . esc_attr($api_key) . '" style="width: 500px;" />';
-    echo '<p class="description">输入阿里智能体应用的API_KEY，用于对接阿里智能体应用。</p>';
+    echo '<p class="description">输入阿里智能体应用的API_KEY。</p>';
 }
 
-// 腾讯Token回调
-function tencent_token_callback() {
-    $token = get_option('tencent_token');
-    echo '<input type="text" name="tencent_token" value="' . esc_attr($token) . '" style="width: 500px;" />';
-    echo '<p class="description">输入腾讯智能体应用的Token，用于对接腾讯智能体应用。</p>';
+function coze_access_token_callback() {
+    $token = get_option('coze_access_token');
+    $expiry = get_option('coze_access_token_expiry');
+    ?>
+    <input type="text" name="coze_access_token" value="<?php echo esc_attr($token); ?>" style="width: 500px;" />
+    <p class="description">输入扣子平台的个人访问令牌。</p>
+    <p>
+        <label for="coze_access_token_expiry">Token 到期时间：</label><br>
+        <input type="datetime-local" id="coze_access_token_expiry" name="coze_access_token_expiry" value="<?php echo esc_attr($expiry); ?>" />
+        <p class="description">设置Token的到期时间，例如：2025-03-01</p>
+    </p>
+    <?php if ($expiry) : ?>
+        <p style="color: #d63638;">当前Token到期时间：<?php echo esc_html(date('Y-m-d H:i', strtotime($expiry))); ?></p>
+    <?php endif; ?>
+    <?php
 }
 
-// 智能体应用列表回调
 function deepseek_agents_list_callback() {
     $agents = get_option('deepseek_agents', []);
     ?>
@@ -476,7 +535,8 @@ function deepseek_agents_list_callback() {
                 <th>名称</th>
                 <th>描述</th>
                 <th>图标URL</th>
-                <th>APP_ID</th>
+                <th>应用ID</th>
+                <th>腾讯Token</th>
                 <th>开场问题</th>
                 <th>操作</th>
             </tr>
@@ -485,15 +545,23 @@ function deepseek_agents_list_callback() {
             <?php foreach ($agents as $index => $agent) : ?>
                 <tr>
                     <td>
-                        <select name="deepseek_agents[<?php echo $index; ?>][provider]">
+                        <select name="deepseek_agents[<?php echo $index; ?>][provider]" onchange="toggleTokenField(this)">
                             <option value="ali" <?php selected($agent['provider'], 'ali'); ?>>阿里</option>
                             <option value="tencent" <?php selected($agent['provider'], 'tencent'); ?>>腾讯</option>
+                            <option value="coze" <?php selected($agent['provider'], 'coze'); ?>>扣子</option>
                         </select>
                     </td>
                     <td><input type="text" name="deepseek_agents[<?php echo $index; ?>][name]" value="<?php echo esc_attr($agent['name']); ?>" /></td>
                     <td><input type="text" name="deepseek_agents[<?php echo $index; ?>][description]" value="<?php echo esc_attr($agent['description']); ?>" /></td>
                     <td><input type="url" name="deepseek_agents[<?php echo $index; ?>][icon]" value="<?php echo esc_attr($agent['icon']); ?>" /></td>
                     <td><input type="text" name="deepseek_agents[<?php echo $index; ?>][app_id]" value="<?php echo esc_attr($agent['app_id']); ?>" /></td>
+                    <td>
+                        <?php if ($agent['provider'] === 'tencent') : ?>
+                            <input type="text" name="deepseek_agents[<?php echo $index; ?>][token]" value="<?php echo esc_attr($agent['token'] ?? ''); ?>" style="width: 200px;" />
+                        <?php else : ?>
+                            <span>-</span>
+                        <?php endif; ?>
+                    </td>
                     <td>
                         <textarea name="deepseek_agents[<?php echo $index; ?>][opening_questions]" rows="3" cols="30"><?php 
                             echo esc_textarea(implode("\n", $agent['opening_questions'] ?? [])); 
@@ -513,15 +581,17 @@ function deepseek_agents_list_callback() {
             var row = table.insertRow();
             row.innerHTML = `
                 <td>
-                    <select name="deepseek_agents[${rowCount}][provider]">
+                    <select name="deepseek_agents[${rowCount}][provider]" onchange="toggleTokenField(this)">
                         <option value="ali">阿里</option>
                         <option value="tencent">腾讯</option>
+                        <option value="coze">扣子</option>
                     </select>
                 </td>
                 <td><input type="text" name="deepseek_agents[${rowCount}][name]" value="" /></td>
                 <td><input type="text" name="deepseek_agents[${rowCount}][description]" value="" /></td>
                 <td><input type="url" name="deepseek_agents[${rowCount}][icon]" value="" /></td>
                 <td><input type="text" name="deepseek_agents[${rowCount}][app_id]" value="" /></td>
+                <td><span>-</span></td>
                 <td>
                     <textarea name="deepseek_agents[${rowCount}][opening_questions]" rows="3" cols="30"></textarea>
                     <p class="description">每行一个开场问题，用换行分隔。</p>
@@ -529,11 +599,22 @@ function deepseek_agents_list_callback() {
                 <td><button type="button" class="button delete-agent">删除</button></td>
             `;
         });
+        
         document.addEventListener('click', function(e) {
             if (e.target.classList.contains('delete-agent')) {
                 e.target.closest('tr').remove();
             }
         });
+
+        function toggleTokenField(select) {
+            var row = select.closest('tr');
+            var tokenCell = row.cells[5];
+            if (select.value === 'tencent') {
+                tokenCell.innerHTML = '<input type="text" name="' + select.name.replace('provider', 'token') + '" value="" style="width: 200px;" />';
+            } else {
+                tokenCell.innerHTML = '<span>-</span>';
+            }
+        }
     </script>
     <?php
 }
@@ -544,24 +625,47 @@ function deepseek_sanitize_agents($input) {
     if (is_array($input)) {
         foreach ($input as $agent) {
             if (!empty($agent['name']) && !empty($agent['app_id'])) {
-                // 处理开场问题从textarea输入的字符串按换行符分割成数组
                 $opening_questions = [];
                 if (!empty($agent['opening_questions']) && is_string($agent['opening_questions'])) {
                     $opening_questions = array_filter(array_map('trim', explode("\n", $agent['opening_questions'])));
                 }
 
-                $agents[] = [
-                    'provider' => sanitize_text_field($agent['provider'] ?? 'ali'), // 默认阿里
+                $sanitized_agent = [
+                    'provider' => sanitize_text_field($agent['provider'] ?? 'ali'),
                     'name' => sanitize_text_field($agent['name']),
                     'description' => sanitize_text_field($agent['description']),
                     'icon' => esc_url_raw($agent['icon']),
                     'app_id' => sanitize_text_field($agent['app_id']),
                     'opening_questions' => array_map('sanitize_text_field', $opening_questions),
                 ];
+                
+                if ($agent['provider'] === 'tencent' && !empty($agent['token'])) {
+                    $sanitized_agent['token'] = sanitize_text_field($agent['token']);
+                }
+                
+                $agents[] = $sanitized_agent;
             }
         }
     }
     return $agents;
+}
+
+// 清理Token到期时间格式
+function deepseek_sanitize_expiry($input) {
+    if (empty($input)) {
+        return '';
+    }
+    $timestamp = strtotime($input);
+    if ($timestamp === false) {
+        add_settings_error(
+            'deepseek_agents_group',
+            'invalid_expiry',
+            'Token 到期时间格式无效，请使用正确的日期时间格式（如 2025-03-01T12:00）。',
+            'error'
+        );
+        return get_option('coze_access_token_expiry');
+    }
+    return date('Y-m-d\TH:i', $timestamp);
 }
 
 // 删除智能体对话记录
@@ -619,13 +723,17 @@ function deepseek_clear_agent_conversation() {
 }
 add_action('wp_ajax_deepseek_clear_agent_conversation', 'deepseek_clear_agent_conversation');
 
-// 注册插件卸载钩子
+// 插件卸载清理
 function deepseek_cleanup_options() {
     if (!defined('WP_UNINSTALL_PLUGIN')) {
         exit;
     }
     delete_option('ali_agent_api_key');
-    delete_option('tencent_token');
+    delete_option('coze_access_token');
+    delete_option('coze_access_token_expiry');
     delete_option('deepseek_agents');
+    delete_option('tencent_token');
 }
 register_uninstall_hook(__FILE__, 'deepseek_cleanup_options');
+
+?>
