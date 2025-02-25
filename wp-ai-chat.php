@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 3.7
+Version: 3.7.1
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -220,6 +220,10 @@ function deepseek_register_settings() {
     register_setting('deepseek_chat_options_group', 'ai_helper_bottom');
     register_setting('deepseek_chat_options_group', 'ai_helper_name'); // 助手名称
     register_setting('deepseek_chat_options_group', 'ai_helper_icon'); // 图标链接
+    // 自定义入口相关设置
+    register_setting('deepseek_chat_options_group', 'enable_custom_entry');
+    register_setting('deepseek_chat_options_group', 'custom_entry_title');
+    register_setting('deepseek_chat_options_group', 'custom_entry_url');
 
     add_settings_section('deepseek_main_section', '基础设置', null, 'deepseek-chat');
 
@@ -304,9 +308,30 @@ function deepseek_register_settings() {
 
     // 未登录提示文字
     add_settings_field('deepseek_login_prompt', '未登录提示文字', 'deepseek_login_prompt_callback', 'deepseek-chat', 'deepseek_main_section');
+
+    // 自定义入口设置项
+    add_settings_field('enable_custom_entry', '对话页面显示自定义入口', 'enable_custom_entry_callback', 'deepseek-chat', 'deepseek_main_section');
+    add_settings_field('custom_entry_title', '自定义入口标题', 'custom_entry_title_callback', 'deepseek-chat', 'deepseek_main_section');
+    add_settings_field('custom_entry_url', '自定义入口链接', 'custom_entry_url_callback', 'deepseek-chat', 'deepseek_main_section');    
     
 }
 add_action('admin_init', 'deepseek_register_settings');
+
+// 自定义入口回调函数
+function enable_custom_entry_callback() {
+    $enabled = get_option('enable_custom_entry', '0');
+    echo '<input type="checkbox" name="enable_custom_entry" value="1" ' . checked(1, $enabled, false) . ' />';
+}
+
+function custom_entry_title_callback() {
+    $title = get_option('custom_entry_title', '');
+    echo '<input type="text" name="custom_entry_title" value="' . esc_attr($title) . '" style="width: 300px;" />';
+}
+
+function custom_entry_url_callback() {
+    $url = get_option('custom_entry_url', '');
+    echo '<input type="url" name="custom_entry_url" value="' . esc_attr($url) . '" style="width: 500px;" />';
+}
 
 // 未登录提示文字输入框回调函数
 function deepseek_login_prompt_callback() {
@@ -863,6 +888,16 @@ function deepseek_chat_shortcode() {
                 <button id="deepseek-new-chat">开启新对话</button>
                 <?php if ( get_option('enable_intelligent_agent', '0') == '1' ): ?>
                     <h3 id="deepseek-agent-title" style="cursor: pointer;">智能体应用</h3>
+                    <?php 
+                    // 自定义入口显示
+                    if ( get_option('enable_custom_entry', '0') == '1' ) {
+                        $custom_title = get_option('custom_entry_title', '');
+                        $custom_url = get_option('custom_entry_url', '');
+                        if ( !empty($custom_title) && !empty($custom_url) ) {
+                            echo '<a href="' . esc_url($custom_url) . '" target="_blank" class="deepseek-custom-entry-title">' . esc_html($custom_title) . '</a>';
+                        }
+                    }
+                    ?>
                 <?php endif; ?>
                 <ul>
                     <?php if ( ! empty($history) ) : ?>
@@ -1728,7 +1763,7 @@ function deepseek_render_article_generator_page() {
             ?>
 
             <p><strong>文章标签：</strong></p>
-            <input type="text" name="post_tags" id="post_tags" style="width: 500px;" placeholder="多个标签用英文逗号分隔，如：科技,智能,教程" />
+            <input type="text" name="post_tags" id="post_tags" style="width: 500px;" placeholder="多个标签用英文逗号分隔，如：科技,AI,教程" />
 
             <p><strong>选择接口(模型需要支持长文本)：</strong></p>
             <?php

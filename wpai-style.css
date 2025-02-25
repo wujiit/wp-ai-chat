@@ -21,11 +21,12 @@ body {
 
 /* 历史对话框样式 */
 #deepseek-chat-history {
-    width: 220px;
+    width: auto;
     background: linear-gradient(180deg, #ffffff, #f9fbfd);
     border-right: 1px solid #e0e0e0;
     padding: 20px;
     overflow-y: auto;
+    box-sizing: border-box;
 }
 
 #deepseek-chat-history ul {
@@ -487,10 +488,10 @@ body {
     transition: all 0.3s ease-in-out;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
     margin: 15px auto;
-    width: fit-content;
+    width: 180px; /* 设置固定宽度 */
+    box-sizing: border-box; /* 确保padding不影响宽度 */
 }
 
-/* 鼠标悬停效果 */
 #deepseek-agent-title:hover {
     background: linear-gradient(135deg, #45a049, #1e7b50);
     transform: scale(1.05);
@@ -855,7 +856,33 @@ body {
 }
 /* 清除对话样式 */
 
-/* 响应式优化 */
+/* 自定义入口标题样式 */
+.deepseek-custom-entry-title {
+    display: block;
+    background: linear-gradient(135deg, #4CAF50, #2E8B57);
+    color: white;
+    padding: 2px 25px;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 16px;
+    text-decoration: none;
+    transition: all 0.3s ease-in-out;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    margin: 10px auto;
+    width: 180px; /* 与智能体应用标题保持一致的宽度 */
+    box-sizing: border-box; /* 确保padding不影响宽度 */
+    text-decoration: none !important;
+}
+
+.deepseek-custom-entry-title:hover {
+    background: linear-gradient(135deg, #45a049, #1e7b50);
+    transform: scale(1.05);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+    color: white;
+}
+
+/* 整体响应式优化 */
 @media (max-width: 768px) {
     #deepseek-chat-container {
         flex-direction: column-reverse; /* 历史对话框放在下方 */
@@ -926,6 +953,14 @@ body {
     #deepseek-agent-title {
         text-align: center;
         width: 90%;
+        max-width: 180px;
         box-sizing: border-box;
-    }        
+    }
+
+    .deepseek-custom-entry-title {
+        text-align: center;
+        width: 90%;
+        max-width: 180px;
+        box-sizing: border-box;
+    }
 }
