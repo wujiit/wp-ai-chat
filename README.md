@@ -3,7 +3,7 @@
 # 小半WordPress ai助手  
 
 [![License](https://img.shields.io/badge/license-GPL-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.5-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/3.5)
+[![Version](https://img.shields.io/badge/version-3.7-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/3.7)
 [![WordPress](https://img.shields.io/badge/WordPress-6.7-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.0-orange.svg)](https://www.php.net/)
 [![Nginx](https://img.shields.io/badge/Nginx-1.2-green.svg)](https://nginx.org/)
@@ -19,7 +19,6 @@
 
 ## 🚀 功能特性
 
-
 1. 内置deepseek文本接口  
 1. 内置阿里通义千问文本接口  
 1. 内置百度千帆(文心一言)文本接口  
@@ -31,6 +30,7 @@
 1. 内置自定义AI文本模型接口  
 1. 支持阿里智能体应用对接  
 1. 支持腾讯元器智能体应用对接  
+1. 支持字节扣子智能体应用对接  
 1. 支持文多多AIPPT接口生成PPT文件  
 1. 支持通义千问的图片生成模型  
 1. 支持通义千问联网搜索(仅部分模型支持)  
@@ -56,6 +56,7 @@
 1. 智能体应用开场问题  
 1. 自定义前台ai助手名称等  
 1. 自定义未登录提示文字
+
 
 ## 📥 安装
 
