@@ -3,7 +3,7 @@
 # 小半WordPress ai助手  
 
 [![License](https://img.shields.io/badge/license-GPL-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.7-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/3.7)
+[![Version](https://img.shields.io/badge/version-3.8-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/3.8)
 [![WordPress](https://img.shields.io/badge/WordPress-6.7-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.0-orange.svg)](https://www.php.net/)
 [![Nginx](https://img.shields.io/badge/Nginx-1.2-green.svg)](https://nginx.org/)
@@ -55,7 +55,8 @@
 1. AI生成PPT可以验证会员权限(部分网站可能不行)  
 1. 智能体应用开场问题  
 1. 自定义前台ai助手名称等  
-1. 自定义未登录提示文字
+1. 自定义未登录提示文字  
+1. 前台用户切换接口  
 
 
 ## 📥 安装
@@ -99,6 +100,6 @@ ppt调用js文件： docmee-ui-sdk-iframe.min.js
 Markdown解析文件： marked.min.js 
 
 
-![4131f8aa8b30d96706bc74514b5bb5d4.jpeg](https://i.miji.bid/2025/02/21/4131f8aa8b30d96706bc74514b5bb5d4.jpeg)
+![23a9559aee78336d28d20eb65fd7a860.jpeg](https://i.miji.bid/2025/02/27/23a9559aee78336d28d20eb65fd7a860.jpeg)
 ![be8d09585a3c7da555d8edd2997d46bf.jpeg](https://i.miji.bid/2025/02/24/be8d09585a3c7da555d8edd2997d46bf.jpeg)
 ![a979fdb418172e3cbb8241d211e5fff5.jpeg](https://i.miji.bid/2025/02/17/a979fdb418172e3cbb8241d211e5fff5.jpeg)
