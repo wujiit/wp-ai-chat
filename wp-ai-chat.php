@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 3.7.1
+Version: 3.8
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -200,11 +200,10 @@ function deepseek_register_settings() {
     register_setting('deepseek_chat_options_group', 'qwen_enable_search'); // 通义千问联网搜索
 
     // 自定义模型设置
-    register_setting('deepseek_chat_options_group', 'custom_api_key');       // 自定义模型 API Key
+    register_setting('deepseek_chat_options_group', 'custom_api_key');       // 自定义模型API Key
     register_setting('deepseek_chat_options_group', 'custom_model_params');    // 自定义模型参数
     register_setting('deepseek_chat_options_group', 'custom_model_url');       // 自定义模型请求 URL
 
-    register_setting('deepseek_chat_options_group', 'chat_interface_choice'); // 接口选择
     register_setting('deepseek_chat_options_group', 'show_ai_helper'); // ai助手显示
     register_setting('deepseek_chat_options_group', 'enable_ai_summary'); // 文章总结
     register_setting('deepseek_chat_options_group', 'enable_ai_voice_reading'); // AI对话语音朗读
@@ -225,7 +224,30 @@ function deepseek_register_settings() {
     register_setting('deepseek_chat_options_group', 'custom_entry_title');
     register_setting('deepseek_chat_options_group', 'custom_entry_url');
 
+    // 文章总结接口选择设置
+    register_setting('deepseek_chat_options_group', 'summary_interface_choice');
+
+    // 多选和默认接口设置
+    register_setting('deepseek_chat_options_group', 'chat_interfaces', array(
+        'default' => array('deepseek'),
+        'sanitize_callback' => 'sanitize_text_field_array'
+    ));
+    register_setting('deepseek_chat_options_group', 'default_chat_interface', array(
+        'default' => 'deepseek',
+        'sanitize_callback' => 'sanitize_text_field'
+    ));
+
+    // 接口切换开关设置
+    register_setting('deepseek_chat_options_group', 'show_interface_switch', array(
+        'default' => '0',
+        'sanitize_callback' => 'sanitize_text_field'
+    ));
+
     add_settings_section('deepseek_main_section', '基础设置', null, 'deepseek-chat');
+
+    // 接口选择和默认接口设置
+    add_settings_field('chat_interfaces', '启用的对话接口', 'chat_interfaces_callback', 'deepseek-chat', 'deepseek_main_section');
+    add_settings_field('default_chat_interface', '默认对话接口', 'default_chat_interface_callback', 'deepseek-chat', 'deepseek_main_section');
 
     // DeepSeek配置项
     add_settings_field('deepseek_api_key', 'DeepSeek API Key', 'deepseek_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
@@ -266,9 +288,6 @@ function deepseek_register_settings() {
     add_settings_field('custom_api_key', '自定义模型 API Key', 'custom_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
     add_settings_field('custom_model_params', '自定义模型参数', 'custom_model_params_callback', 'deepseek-chat', 'deepseek_main_section');
     add_settings_field('custom_model_url', '自定义模型请求 URL', 'custom_model_url_callback', 'deepseek-chat', 'deepseek_main_section');
-
-    // 接口选择框
-    add_settings_field('chat_interface_choice', '选择对话接口', 'chat_interface_choice_callback', 'deepseek-chat', 'deepseek_main_section');
 
     // 文章总结框
     add_settings_field('enable_ai_summary', '文章AI总结(需要长文本模型)', 'enable_ai_summary_callback', 'deepseek-chat', 'deepseek_main_section');
@@ -312,10 +331,110 @@ function deepseek_register_settings() {
     // 自定义入口设置项
     add_settings_field('enable_custom_entry', '对话页面显示自定义入口', 'enable_custom_entry_callback', 'deepseek-chat', 'deepseek_main_section');
     add_settings_field('custom_entry_title', '自定义入口标题', 'custom_entry_title_callback', 'deepseek-chat', 'deepseek_main_section');
-    add_settings_field('custom_entry_url', '自定义入口链接', 'custom_entry_url_callback', 'deepseek-chat', 'deepseek_main_section');    
+    add_settings_field('custom_entry_url', '自定义入口链接', 'custom_entry_url_callback', 'deepseek-chat', 'deepseek_main_section');  
+
+    // 文章总结接口
+    add_settings_field('summary_interface_choice', '文章总结接口', 'summary_interface_choice_callback', 'deepseek-chat', 'deepseek_main_section');
+
+    // 接口切换显示开关
+    add_settings_field('show_interface_switch', '前台显示接口切换', 'show_interface_switch_callback', 'deepseek-chat', 'deepseek_main_section');
+
+    // 用户选择接口的处理
+    add_action('wp_ajax_deepseek_switch_interface', 'deepseek_handle_interface_switch');
     
 }
 add_action('admin_init', 'deepseek_register_settings');
+
+// 接口切换显示开关回调函数
+function show_interface_switch_callback() {
+    $enabled = get_option('show_interface_switch', '0');
+    ?>
+    <input type="checkbox" name="show_interface_switch" value="1" <?php checked(1, $enabled); ?> />
+    <p class="description">启用后，前台页面底部状态栏将显示接口选择选项，用户可自行切换接口</p>
+    <?php
+}
+
+// 数组sanitize回调函数
+function sanitize_text_field_array($input) {
+    if (!is_array($input)) {
+        return array();
+    }
+    return array_map('sanitize_text_field', $input);
+}
+
+// 多选接口回调
+function chat_interfaces_callback() {
+    $options = get_option('chat_interfaces', array('deepseek'));
+    $interfaces = array(
+        'deepseek' => 'DeepSeek',
+        'openai' => 'OpenAI',
+        'grok' => 'Grok',
+        'qwen' => '通义千问',
+        'kimi' => 'Kimi',
+        'doubao' => '豆包AI',
+        'qianfan' => '千帆(文心一言)',
+        'hunyuan' => '腾讯混元',
+        'custom' => '自定义接口'
+    );
+    ?>
+    <select name="chat_interfaces[]" multiple style="height: 150px;">
+        <?php foreach ($interfaces as $value => $label): ?>
+            <option value="<?php echo esc_attr($value); ?>" <?php echo in_array($value, $options) ? 'selected' : ''; ?>>
+                <?php echo esc_html($label); ?>
+            </option>
+        <?php endforeach; ?>
+    </select>
+    <p class="description">按住Ctrl或Cmd键可多选启用的接口</p>
+    <?php
+}
+
+// 对话默认接口回调
+function default_chat_interface_callback() {
+    $default = get_option('default_chat_interface', 'deepseek');
+    $options = get_option('chat_interfaces', array('deepseek'));
+    $interfaces = array(
+        'deepseek' => 'DeepSeek',
+        'openai' => 'OpenAI',
+        'grok' => 'Grok',
+        'qwen' => '通义千问',
+        'kimi' => 'Kimi',
+        'doubao' => '豆包AI',
+        'qianfan' => '千帆(文心一言)',
+        'hunyuan' => '腾讯混元',
+        'custom' => '自定义接口'
+    );
+    ?>
+    <select name="default_chat_interface">
+        <?php foreach ($interfaces as $value => $label): ?>
+            <?php if (in_array($value, $options)): // 只显示已启用的接口 ?>
+                <option value="<?php echo esc_attr($value); ?>" <?php selected($default, $value); ?>>
+                    <?php echo esc_html($label); ?>
+                </option>
+            <?php endif; ?>
+        <?php endforeach; ?>
+    </select>
+    <p class="description">选择默认使用的对话接口</p>
+    <?php
+}
+
+// 文章总结接口选择回调函数
+function summary_interface_choice_callback() {
+    $choice = get_option('summary_interface_choice', 'deepseek'); // 默认选择DeepSeek
+    ?>
+    <select name="summary_interface_choice">
+        <option value="deepseek" <?php selected($choice, 'deepseek'); ?>>DeepSeek</option>
+        <option value="kimi" <?php selected($choice, 'kimi'); ?>>Kimi</option>
+        <option value="openai" <?php selected($choice, 'openai'); ?>>Openai</option>
+        <option value="grok" <?php selected($choice, 'grok'); ?>>Grok</option>          
+        <option value="doubao" <?php selected($choice, 'doubao'); ?>>豆包AI</option>
+        <option value="qwen" <?php selected($choice, 'qwen'); ?>>通义千问</option>
+        <option value="qianfan" <?php selected($choice, 'qianfan'); ?>>千帆(文心一言)</option>
+        <option value="hunyuan" <?php selected($choice, 'hunyuan'); ?>>腾讯混元</option>
+        <option value="custom" <?php selected($choice, 'custom'); ?>>自定义接口</option>
+    </select>
+    <p class="description">选择用于生成文章总结的AI接口</p>
+    <?php
+}
 
 // 自定义入口回调函数
 function enable_custom_entry_callback() {
@@ -643,25 +762,6 @@ function deepseek_model_callback() {
     echo '<input type="text" name="deepseek_model" value="' . esc_attr($model) . '" style="width: 500px;" />';    
 }
 
-// 接口选择函数回调
-function chat_interface_choice_callback() {
-    $choice = get_option('chat_interface_choice', 'deepseek'); // 默认选择DeepSeek
-    ?>
-    <select name="chat_interface_choice">
-        <option value="deepseek" <?php selected($choice, 'deepseek'); ?>>DeepSeek</option>
-        <option value="kimi" <?php selected($choice, 'kimi'); ?>>Kimi</option>
-        <option value="openai" <?php selected($choice, 'openai'); ?>>Openai</option>
-        <option value="grok" <?php selected($choice, 'grok'); ?>>Grok</option>          
-        <option value="doubao" <?php selected($choice, 'doubao'); ?>>豆包AI</option>
-        <option value="qwen" <?php selected($choice, 'qwen'); ?>>通义千问</option>
-        <option value="qianfan" <?php selected($choice, 'qianfan'); ?>>千帆(文心一言)</option>
-        <option value="hunyuan" <?php selected($choice, 'hunyuan'); ?>>腾讯混元</option>
-        <option value="custom" <?php selected($choice, 'custom'); ?>>自定义接口</option>
-    </select>
-    <?php
-}
-
-
 // 设置页面
 function deepseek_render_settings_page() {
     $balance = get_deepseek_balance();
@@ -859,15 +959,54 @@ function deepseek_enqueue_assets() {
 }
 add_action('wp_enqueue_scripts', 'deepseek_enqueue_assets');
 
+// 处理接口切换的AJAX请求
+function deepseek_handle_interface_switch() {
+    check_ajax_referer('interface_switch_action', 'nonce');
+    
+    if (!is_user_logged_in()) {
+        wp_send_json_error('请先登录');
+        return;
+    }
+
+    $user_id = get_current_user_id();
+    $selected_interface = isset($_POST['selected_interface']) ? sanitize_text_field($_POST['selected_interface']) : '';
+    $enabled_interfaces = get_option('chat_interfaces', array('deepseek'));
+    
+    if (in_array($selected_interface, $enabled_interfaces)) {
+        update_user_meta($user_id, 'selected_chat_interface', $selected_interface);
+        wp_send_json_success("接口已切换为: $selected_interface");
+    } else {
+        wp_send_json_error('无效的接口选择');
+    }
+}
+
+// 获取用户当前选择的接口
+function deepseek_get_user_interface() {
+    $user_id = get_current_user_id();
+    $enabled_interfaces = get_option('chat_interfaces', array('deepseek'));
+    $default_interface = get_option('default_chat_interface', 'deepseek');
+    
+    if (is_user_logged_in()) {
+        $user_interface = get_user_meta($user_id, 'selected_chat_interface', true);
+        return $user_interface && in_array($user_interface, $enabled_interfaces) ? $user_interface : $default_interface;
+    }
+    return $default_interface;
+}
+
 
 // 对话 开始
 function deepseek_chat_shortcode() {
     global $wpdb;
     $table_name = $wpdb->prefix . 'deepseek_chat_logs';
     $user_id    = get_current_user_id();
+    $show_interface_switch = get_option('show_interface_switch', '0');
+    $enabled_interfaces = get_option('chat_interfaces', array('deepseek'));
+    $default_interface = get_option('default_chat_interface', 'deepseek');
+    $qwen_enable_search = get_option('qwen_enable_search', '0');
+    $current_interface = deepseek_get_user_interface();
 
     $history = array();
-    if ( is_user_logged_in() ) {
+    if (is_user_logged_in()) {
         $history = $wpdb->get_results( 
             $wpdb->prepare(
                 "SELECT * FROM $table_name 
@@ -884,24 +1023,23 @@ function deepseek_chat_shortcode() {
     <div id="deepseek-chat-container">
         <!-- 历史记录区域 -->
         <div id="deepseek-chat-history">
-            <?php if ( is_user_logged_in() ): ?>
+            <?php if (is_user_logged_in()): ?>
                 <button id="deepseek-new-chat">开启新对话</button>
-                <?php if ( get_option('enable_intelligent_agent', '0') == '1' ): ?>
+                <?php if (get_option('enable_intelligent_agent', '0') == '1'): ?>
                     <h3 id="deepseek-agent-title" style="cursor: pointer;">智能体应用</h3>
                     <?php 
-                    // 自定义入口显示
-                    if ( get_option('enable_custom_entry', '0') == '1' ) {
+                    if (get_option('enable_custom_entry', '0') == '1') {
                         $custom_title = get_option('custom_entry_title', '');
                         $custom_url = get_option('custom_entry_url', '');
-                        if ( !empty($custom_title) && !empty($custom_url) ) {
+                        if (!empty($custom_title) && !empty($custom_url)) {
                             echo '<a href="' . esc_url($custom_url) . '" target="_blank" class="deepseek-custom-entry-title">' . esc_html($custom_title) . '</a>';
                         }
                     }
                     ?>
                 <?php endif; ?>
                 <ul>
-                    <?php if ( ! empty($history) ) : ?>
-                        <?php foreach ( $history as $log ) : ?>
+                    <?php if (!empty($history)): ?>
+                        <?php foreach ($history as $log): ?>
                             <li data-conversation-id="<?php echo $log->conversation_id; ?>">
                                 <span class="deepseek-chat-title">
                                     <?php 
@@ -923,16 +1061,15 @@ function deepseek_chat_shortcode() {
 
         <!-- 主对话区域 -->
         <div id="deepseek-chat-main">
-            <!-- 消息显示区域 -->
             <div id="deepseek-chat-messages">
                 <div class="message-bubble bot" id="chatbot-prompt">你好，我可以帮你写作、写文案、翻译，有问题请问我~</div>
                 <?php
                 $custom_prompts = get_option('deepseek_custom_prompts', '');
-                if ( ! empty($custom_prompts) ) {
-                    $prompts = array_filter( array_map('trim', explode("\n", $custom_prompts)) );
-                    if ( ! empty($prompts) ) {
+                if (!empty($custom_prompts)) {
+                    $prompts = array_filter(array_map('trim', explode("\n", $custom_prompts)));
+                    if (!empty($prompts)) {
                         echo '<div id="deepseek-custom-prompts">';
-                        foreach ( $prompts as $prompt ) {
+                        foreach ($prompts as $prompt) {
                             echo '<span class="deepseek-prompt">' . esc_html($prompt) . '</span>';
                         }
                         echo '</div>';
@@ -941,14 +1078,12 @@ function deepseek_chat_shortcode() {
                 ?>
             </div>
 
-            <!-- 清除对话按钮 -->
             <div id="clear-conversation-container">
                 <button id="clear-conversation-button" style="display: none;">清除对话</button>
             </div>
 
-            <!-- 输入区域 -->
             <div id="deepseek-chat-input-container">
-                <?php if ( is_user_logged_in() ) : ?>
+                <?php if (is_user_logged_in()): ?>
                     <textarea id="deepseek-chat-input" placeholder="输入你的消息..." rows="4"></textarea>
                     <button id="deepseek-chat-send">发送</button>
                 <?php else: 
@@ -960,14 +1095,43 @@ function deepseek_chat_shortcode() {
                 <?php endif; ?>
             </div>
 
-            <!-- 违规关键词提示 -->
             <div id="keyword-error-message" style="color: red; display: none; margin-top: 5px; margin-left: 10px;">
                 内容包含违规关键词，小助手无法正常处理，请刷新网页修改之后再试。
             </div>
 
-            <!-- 功能选项栏 -->
             <div id="deepseek-options-bar">
-                <?php if ( get_option('qwen_enable_search') && get_option('chat_interface_choice') === 'qwen' ): ?>
+                <?php if ($show_interface_switch == '1' && is_user_logged_in()): ?>
+                    <div class="deepseek-option-item deepseek-interface-select">
+                        <form id="interface-switch-form" method="post" action="">
+                            <?php wp_nonce_field('interface_switch_action', 'interface_switch_nonce'); ?>
+                            <label for="chat-interface-select">选择接口:</label>
+                            <select name="selected_interface" id="chat-interface-select">
+                                <?php
+                                $interfaces = array(
+                                    'deepseek' => 'DeepSeek',
+                                    'openai' => 'OpenAI',
+                                    'grok' => 'Grok',
+                                    'qwen' => '通义千问',
+                                    'kimi' => 'Kimi',
+                                    'doubao' => '豆包AI',
+                                    'qianfan' => '文心一言',
+                                    'hunyuan' => '腾讯混元',
+                                    'custom' => '备份接口'
+                                );
+                                foreach ($enabled_interfaces as $interface) {
+                                    if (isset($interfaces[$interface])) {
+                                        $selected = ($interface === $current_interface) ? 'selected' : '';
+                                        echo '<option value="' . esc_attr($interface) . '" ' . $selected . '>' . 
+                                             esc_html($interfaces[$interface]) . '</option>';
+                                    }
+                                }
+                                ?>
+                            </select>
+                        </form>
+                    </div>
+                <?php endif; ?>
+
+                <?php if (in_array('qwen', $enabled_interfaces) && $qwen_enable_search == '1'): ?>
                     <div class="deepseek-option-item deepseek-search-toggle">
                         <label class="switch">
                             <input type="checkbox" id="enable-search">
@@ -980,7 +1144,7 @@ function deepseek_chat_shortcode() {
                 <?php
                 $tutorial_title = get_option('ai_tutorial_title', '');
                 $tutorial_url   = get_option('ai_tutorial_url', '');
-                if ( ! empty($tutorial_title) && ! empty($tutorial_url) ): ?>
+                if (!empty($tutorial_title) && !empty($tutorial_url)): ?>
                     <div class="deepseek-option-item deepseek-tutorial-link">
                         <a href="<?php echo esc_url($tutorial_url); ?>" target="_blank">
                             <?php echo esc_html($tutorial_title); ?>
@@ -991,12 +1155,10 @@ function deepseek_chat_shortcode() {
         </div>
     </div>
 
-    <!-- 底部提示 -->
     <div id="bottom-description" style="margin-top: 5px; text-align: center;">
         内容由Ai自动生成，不代表本站观点。
     </div>
 
-    <!-- 回车发送的JS -->
     <script type="text/javascript">
     document.addEventListener('DOMContentLoaded', function() {
         const input = document.getElementById('deepseek-chat-input');
@@ -1010,7 +1172,6 @@ function deepseek_chat_shortcode() {
             });
         }
 
-        // 清除对话按钮点击事件
         const clearButton = document.getElementById('clear-conversation-button');
         if (clearButton) {
             clearButton.addEventListener('click', function() {
@@ -1019,6 +1180,12 @@ function deepseek_chat_shortcode() {
         }
     });
     </script>
+
+    <script type="text/javascript">
+        var ajax_nonce = '<?php echo wp_create_nonce("interface_switch_action"); ?>';
+        var ajax_url = '<?php echo admin_url("admin-ajax.php"); ?>';
+    </script>
+
     <?php
     return ob_get_clean();
 }
@@ -1027,16 +1194,14 @@ add_shortcode('deepseek_chat', 'deepseek_chat_shortcode');
 // 使用REST API方式处理消息
 function deepseek_send_message_rest( WP_REST_Request $request ) {
     global $wpdb;
-    $table_name = $wpdb->prefix . 'deepseek_chat_logs';
 
+    $table_name = $wpdb->prefix . 'deepseek_chat_logs';
     $message = sanitize_text_field( $request->get_param('message') );
     $conversation_id = $request->get_param('conversation_id') ? intval($request->get_param('conversation_id')) : null;
     $user_id = get_current_user_id();
-    $interface_choice = get_option('chat_interface_choice', 'deepseek');
+    $interface_choice = deepseek_get_user_interface(); // 使用用户选择的接口
     $enable_search = filter_var($request->get_param('enable_search'), FILTER_VALIDATE_BOOLEAN); // 获取前端开关状态
 
-    // 获取用户输入的消息
-    $message = sanitize_text_field( $request->get_param('message') );
     // 如果启用了关键词检测，进行关键词检查
     $enable_keyword_detection = get_option('enable_keyword_detection', '0');
     if ($enable_keyword_detection) {
@@ -1114,7 +1279,7 @@ function deepseek_send_message_rest( WP_REST_Request $request ) {
             ]);
         }
     }
-    // 文本对话分支（流式返回）
+    // 文本对话分支
     switch ($interface_choice) {
         case 'deepseek':
             $api_key = get_option('deepseek_api_key');
@@ -1205,7 +1370,7 @@ function deepseek_send_message_rest( WP_REST_Request $request ) {
     header('X-Accel-Buffering: no');
     header('Connection: keep-alive');
 
-    $fullReply = '';
+    $fullReply = [];
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $api_url);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
@@ -1214,23 +1379,26 @@ function deepseek_send_message_rest( WP_REST_Request $request ) {
     ]);
     curl_setopt($ch, CURLOPT_POST, 1);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    // 利用write callback实现流式输出
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
     curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($ch, $chunk) use (&$fullReply) {
         echo $chunk;
         if (ob_get_level() > 0) {
             ob_flush();
         }
         flush();
-        $fullReply .= $chunk;
+        $fullReply[] = $chunk; // 收集完整回复用于后续保存
         return strlen($chunk);
     });
     curl_setopt($ch, CURLOPT_TIMEOUT, 0);
     curl_exec($ch);
     curl_close($ch);
 
-    // 流式输出结束后，解析SSE数据提取有效内容并保存到数据库
-    $lines = explode("\n", $fullReply);
-    $processedReply = '';
+
+    // 处理流式数据并提取reasoning_content和content
+    $processedReply = ['content' => '', 'reasoning_content' => ''];
+    $fullReplyString = implode('', $fullReply);
+    $lines = explode("\n", $fullReplyString);
+
     foreach ($lines as $line) {
         $line = trim($line);
         if (strpos($line, 'data:') === 0) {
@@ -1239,12 +1407,20 @@ function deepseek_send_message_rest( WP_REST_Request $request ) {
                 continue;
             }
             $jsonData = json_decode($dataPart, true);
-            if ($jsonData && isset($jsonData['choices'][0]['delta']['content'])) {
-                $processedReply .= $jsonData['choices'][0]['delta']['content'];
+            if ($jsonData && isset($jsonData['choices'][0]['delta'])) {
+                $delta = $jsonData['choices'][0]['delta'];
+            if (isset($delta['content'])) {
+                $processedReply['content'] .= $delta['content'];
+            }
+            if (isset($delta['reasoning_content'])) { // 假设模型支持返回reasoning_content
+                $processedReply['reasoning_content'] .= $delta['reasoning_content'];
             }
         }
     }
-    $reply = $processedReply;
+}
+
+    // 保存到数据库
+    $reply = json_encode($processedReply); // 将content和reasoning_content一起保存
     $wpdb->insert($table_name, [
         'user_id'             => $user_id,
         'conversation_id'     => $conversation_id ?: 0,
@@ -1260,7 +1436,7 @@ function deepseek_send_message_rest( WP_REST_Request $request ) {
         );
     }
 
-    // 输出一条SSE事件，将conversation_id返回给前端
+    // 输出conversation_id
     echo "\n";
     echo "data: " . json_encode(['conversation_id' => $conversation_id]) . "\n\n";
     if (ob_get_level() > 0) {
@@ -1349,6 +1525,7 @@ function deepseek_load_log() {
     $conversation_id = intval($_GET['conversation_id']);
     $user_id = get_current_user_id();
 
+    // 从数据库中查询指定用户和对话ID的记录
     $logs = $wpdb->get_results($wpdb->prepare(
         "SELECT * FROM $table_name 
         WHERE conversation_id = %d 
@@ -1358,30 +1535,50 @@ function deepseek_load_log() {
         $user_id
     ));
 
+    // 如果没有找到记录，返回错误信息
     if (empty($logs)) {
         wp_send_json(array('success' => false, 'message' => '未找到对话记录。'));
         return;
     }
 
+    // 处理每条记录
     $processed = array();
     foreach ($logs as $log) {
+        // 解析response字段（JSON格式）
         $response = json_decode($log->response, true);
         
+        // 处理图片生成消息
         if ($response && isset($response['image_url'])) {
-            $html = '<div class="image-prompt">'.esc_html($response['actual_prompt']).'</div>';
-            $html .= '<img src="'.esc_url($response['image_url']).'" style="max-width:100%;height:auto;" />';
+            $html = '<div class="image-prompt">' . esc_html($response['actual_prompt']) . '</div>';
+            $html .= '<img src="' . esc_url($response['image_url']) . '" style="max-width:100%;height:auto;" />';
             $processed[] = array(
                 'message'  => esc_html($log->message),
-                'response' => $html
+                'response' => $html // 图片消息仍返回HTML
             );
         } else {
+            // 处理文本消息，仅返回纯文本内容
+            $content = '';
+            $reasoning_content = '';
+            if (is_array($response)) {
+                // 如果response是数组，提取content和reasoning_content
+                $content = isset($response['content']) ? $response['content'] : '';
+                $reasoning_content = isset($response['reasoning_content']) ? $response['reasoning_content'] : '';
+            } else {
+                // 如果response是字符串，直接使用
+                $content = $log->response;
+            }
+
             $processed[] = array(
-                'message'  => $log->message,
-                'response' => $log->response
+                'message'  => esc_html($log->message),
+                'response' => [
+                    'content' => $content,
+                    'reasoning_content' => $reasoning_content
+                ]
             );
         }
     }
 
+    // 返回成功响应和处理后的消息数组
     wp_send_json([
         'success'  => true, 
         'messages' => $processed
@@ -1533,7 +1730,10 @@ function deepseek_call_ai_api($content) {
     $url = '';
 
     // 根据选择的接口设置API Key、模型和URL
-    $interface_choice = get_option('chat_interface_choice');
+    $interface_choice = ($interface_type === 'summary') 
+        ? get_option('summary_interface_choice', 'deepseek') 
+        : get_option('chat_interface_choice', 'deepseek');
+
     switch ($interface_choice) {
         case 'deepseek':
             $api_key = get_option('deepseek_api_key');
@@ -1583,6 +1783,12 @@ function deepseek_call_ai_api($content) {
                  wp_send_json(['success' => false, 'message' => '自定义模型设置不完整']);
             }
             break;            
+    }
+
+    // 检查必要参数
+    if (empty($api_key) || empty($model) || empty($url)) {
+        error_log('AI接口配置缺失');
+        return false;
     }
 
     // 构建请求数据
