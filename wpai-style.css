@@ -425,7 +425,7 @@ body {
 }
 
 .deepseek-interface-select select {
-    padding: 1px 1px;
+    padding: 2px 1px;
     border: 1px solid #e0e0e0;
     border-radius: 4px;
     font-size: 13px;
@@ -546,8 +546,8 @@ body {
     padding: 15px;
     display: flex;
     flex-wrap: wrap; /* 允许换行 */
-    gap: 10px; /* 元素间距 */
-    justify-content: flex-start; /* 左对齐 */
+    gap: 10px;
+    justify-content: flex-start;
 }
 
 .agent-item {
@@ -689,7 +689,7 @@ body {
     padding: 12px;
     display: flex;
     flex-wrap: wrap; /* 允许换行 */
-    gap: 8px; /* 元素间距 */
+    gap: 8px;
     justify-content: flex-start; /* 左对齐 */
 }
 
@@ -752,40 +752,43 @@ body {
 /* 自定义错误提示框样式 */
 .custom-notification {
     position: fixed;
-    top: 20px;
-    right: 20px;
-    padding: 15px 20px;
-    border-radius: 5px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 15px 25px;
+    border-radius: 10px;
     color: #fff;
-    font-size: 14px;
+    font-size: 16px;
+    font-weight: 500;
     z-index: 1000;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    min-width: 200px;
-    max-width: 400px;
+    min-width: 250px;
+    max-width: 90%;
     opacity: 0;
     animation: fadeIn 0.3s ease forwards;
 }
 
 /* 成功提示框 */
 .custom-notification.success {
-    background-color: #28a745;
+    background: linear-gradient(90deg, #4caf50, #2e7d32);
 }
 
 /* 错误提示框 */
 .custom-notification.error {
-    background-color: #dc3545;
+    background: linear-gradient(90deg, #ff4d4d, #e60000);
 }
 
 /* 关闭按钮 */
 .close-notification {
-    margin-left: 10px;
-    font-size: 18px;
+    margin-left: 15px;
+    font-size: 20px;
     cursor: pointer;
     line-height: 1;
     opacity: 0.8;
+    transition: opacity 0.3s ease;
 }
 
 .close-notification:hover {
@@ -796,20 +799,38 @@ body {
 @keyframes fadeIn {
     from {
         opacity: 0;
-        transform: translateY(-10px);
+        transform: translate(-50%, -60%);
     }
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translate(-50%, -50%);
     }
 }
 
-/* 防止提示框超出屏幕宽度 */
-@media (max-width: 480px) {
+/* 淡出动画 */
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+    }
+    to {
+        opacity: 0;
+        transform: translate(-50%, -60%);
+    }
+}
+
+/* 自定义提示框响应式调整 */
+@media (max-width: 768px) {
     .custom-notification {
-        right: 10px;
-        left: 10px;
-        width: auto;
+        padding: 12px 20px;
+        font-size: 14px;
+        min-width: 200px;
+        max-width: 80%;
+    }
+
+    .close-notification {
+        margin-left: 10px;
+        font-size: 18px;
     }
 }
 /* 自定义错误提示框样式 */
@@ -960,6 +981,175 @@ body {
 .final-content strong {
     color: #27ae60;
     font-weight: 600;
+}
+
+/* 上传文件板块整体样式 */
+.deepseek-option-item.upload-section {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 12px;
+    background: linear-gradient(90deg, #ffffff, #f9fbfd); /* 与选项栏一致 */
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.3s ease, transform 0.2s ease;
+    flex-shrink: 0; /* 防止被压缩 */
+}
+
+.deepseek-option-item.upload-section:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+}
+
+/* 上传文件按钮样式 */
+#deepseek-upload-file-btn {
+    padding: 3px 10px;
+    background: linear-gradient(90deg, #4a90e2, #357abd);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    white-space: nowrap; /* 防止换行 */
+    min-width: 80px;
+}
+
+#deepseek-upload-file-btn:hover {
+    background: linear-gradient(90deg, #357abd, #2a5d8c);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+#deepseek-upload-file-btn:active {
+    transform: scale(0.98);
+}
+
+/* 文件上传输入框*/
+#deepseek-file-input {
+    display: none;
+}
+
+/* 已上传文件列表容器 */
+#uploaded-files-list {
+    display: none;
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding: 2px 6px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    max-width: 300px;
+    min-width: 100px;
+    height: 40px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+    align-items: center;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin; /* Firefox细滚动条 */
+    scrollbar-color: #888 #f0f0f0; /* Firefox滚动条颜色 */
+}
+
+/* 显示文件列表时应用样式 */
+#uploaded-files-list.visible {
+    display: flex; /* 上传后显示 */
+}
+
+/* 自定义滚动条样式（Chrome、Safari） */
+#uploaded-files-list::-webkit-scrollbar {
+    height: 8px;
+}
+
+#uploaded-files-list::-webkit-scrollbar-track {
+    background: #f0f0f0;
+    border-radius: 4px;
+}
+
+#uploaded-files-list::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+#uploaded-files-list::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* 单个已上传文件项 */
+#uploaded-files-list div {
+    display: flex;
+    align-items: center;
+    padding: 2px 6px;
+    font-size: 12px;
+    color: #333;
+    background: #f0f0f0;
+    border-radius: 4px;
+    white-space: nowrap; /* 防止换行 */
+    margin-right: 4px;
+}
+
+/* 文件名样式 */
+#uploaded-files-list div span {
+    flex-grow: 1;
+    overflow: hidden;
+    text-overflow: ellipsis; /* 超出部分显示省略号 */
+}
+
+/* 删除按钮样式 */
+#uploaded-files-list div button {
+    background: linear-gradient(90deg, #ff4d4d, #e60000);
+    color: #fff;
+    border: none;
+    padding: 2px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    transition: background 0.3s ease, transform 0.2s ease;
+    margin-left: 6px;
+    white-space: nowrap; /* 防止换行 */
+}
+
+#uploaded-files-list div button:hover {
+    background: linear-gradient(90deg, #e60000, #cc0000);
+    transform: translateY(-1px);
+}
+
+/* 文件上传板块响应式 */
+@media (max-width: 768px) {
+    .deepseek-option-item.upload-section {
+        flex-direction: row; /* 保持水平排列 */
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+    }
+
+    #deepseek-upload-file-btn {
+        padding: 6px 12px;
+        font-size: 12px;
+        min-width: 70px;
+    }
+
+    #uploaded-files-list {
+        max-width: 260px; /* 手机端缩小最大宽度 */
+        height: 35px;
+        padding: 2px 4px;
+        min-width: 100px;
+    }
+
+    #uploaded-files-list div {
+        padding: 2px 4px;
+        font-size: 11px;
+        margin-right: 2px;
+    }
+
+    #uploaded-files-list div button {
+        padding: 2px 4px;
+        font-size: 10px;
+    }
 }
 
 /* 整体响应式优化 */
