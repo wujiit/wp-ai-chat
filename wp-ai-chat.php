@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 3.9
+Version: 3.9.1
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -2288,7 +2288,7 @@ function deepseek_render_article_generator_page() {
             <!-- 显示发布结果的区域 -->
             <div id="publish-result" style="display: none; margin-top: 10px;"></div>
         </form>
-        生成的标题和内容还是需要自己再修改下。
+        生成的标题和内容还是需要自己再修改下，只适合纯文本内容的文章生成。
     </div>
 
     <script>
@@ -2433,7 +2433,7 @@ function deepseek_generate_article_stream_ajax() {
         'model' => $model,
         'messages' => [
             ['role' => 'system', 'content' => 'You are a helpful assistant.'],
-            ['role' => 'user', 'content' => '根据关键词 "' . $keyword . '" 生成文章和标题，文章行首不要带*号或者多个#号，不要带Markdown格式符号']
+            ['role' => 'user', 'content' => '根据关键词 "' . $keyword . '" 生成文章和标题，文章行首不要带*号或者多个#号，也不要带Markdown格式符号']
         ],
         'stream' => true,
     ]);
