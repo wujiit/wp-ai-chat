@@ -4,7 +4,6 @@ function convertMarkdownToHTML(markdownText) {
 }
 
 // 通过DEEPSEEK_VARS对象访问变量
-/* eslint-disable no-undef */ // 添加此行消除编辑器警告
 var aiVoiceEnabled = parseInt(DEEPSEEK_VARS.AI_VOICE_ENABLED);
 var deepseek_rest_nonce = DEEPSEEK_VARS.REST_NONCE;
 var restUrl = DEEPSEEK_VARS.REST_URL;
@@ -14,17 +13,17 @@ var keywords = DEEPSEEK_VARS.KEYWORDS.split(',');
 var file_upload_nonce = DEEPSEEK_VARS.FILE_UPLOAD_NONCE;
 
 // 全局变量
-var currentConversationId = null; // 普通对话ID
-var currentAppId = null;          // 智能体应用ID
-var showingAgents = false;        // 是否显示智能体应用列表
-var currentPage = 'home';         // 当前页面状态：'home', 'conversation', 'agent', 'agentList'
+var currentConversationId = null;
+var currentAppId = null;
+var showingAgents = false;
+var currentPage = 'home';
 let uploadedFiles = [];
 
 // 设置当前页面状态
 function setCurrentPage(page) {
     currentPage = page;
     localStorage.setItem('currentPage', page);
-    toggleClearButtonVisibility(); // 更新按钮显示状态
+    toggleClearButtonVisibility();
 }
 
 // 设置普通对话 ID
@@ -55,7 +54,15 @@ function setCurrentAppId(appId) {
     localStorage.removeItem('currentConversationId');
 }
 
-// 页面加载时恢复状态
+// 显示清除对话按钮的可见性
+function toggleClearButtonVisibility() {
+    var clearButton = document.getElementById('clear-conversation-button');
+    if (clearButton) {
+        clearButton.style.display = (currentConversationId || currentAppId) ? 'block' : 'none';
+    }
+}
+
+// 页面加载时恢复状态并初始化模型选择
 window.addEventListener('load', function() {
     var storedConversationId = localStorage.getItem('currentConversationId');
     var storedAppId = localStorage.getItem('currentAppId');
@@ -64,7 +71,6 @@ window.addEventListener('load', function() {
 
     currentPage = storedPage;
 
-    // 只在需要恢复特定状态时操作，不干扰首页
     if (storedPage === 'conversation' && storedConversationId) {
         setCurrentConversationId(storedConversationId);
         loadChatLog(storedConversationId);
@@ -76,13 +82,15 @@ window.addEventListener('load', function() {
         setCurrentPage('agentList');
         loadAgentList();
     }
-    // 如果是 'home'，不做任何操作，保持首页原始状态
 
     var enableSearchSwitch = document.getElementById('enable-search');
     if (enableSearchSwitch) {
         var storedSearchState = localStorage.getItem('enableSearchState');
         enableSearchSwitch.checked = storedSearchState === 'true';
     }
+
+    // 初始化模型选择框
+    updateModelSelectOptions();
 });
 
 // 默认提示
@@ -120,6 +128,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 event.preventDefault();
             } else {
                 if (errorMessage) errorMessage.style.display = 'none';
+                handleSendMessage();
             }
         });
     }
@@ -208,6 +217,15 @@ function addVoicePlayback(container, text) {
     container.appendChild(playIcon);
 }
 
+// 自定义通知
+function showCustomNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `custom-notification ${type}`;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    setTimeout(() => notification.remove(), 3000);
+}
+
 // 添加接口切换的AJAX处理
 document.addEventListener('DOMContentLoaded', function() {
     var form = document.getElementById('interface-switch-form');
@@ -230,16 +248,38 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 if (data.success) {
                     console.log('接口切换成功:', data.data);
+                    showCustomNotification('已切换到 ' + this.options[this.selectedIndex].text, 'success');
+                    updateModelSelectOptions(); // 更新模型参数选项
                 } else {
                     console.error('接口切换失败:', data.data);
+                    showCustomNotification('接口切换失败', 'error');
                 }
             })
             .catch(error => {
                 console.error('接口切换请求失败:', error);
+                showCustomNotification('接口切换请求失败', 'error');
             });
         });
     }
 });
+
+// 更新模型选择框选项
+function updateModelSelectOptions() {
+    var interfaceSelect = document.getElementById('chat-interface-select');
+    var modelSelect = document.getElementById('chat-model-select');
+    if (!interfaceSelect || !modelSelect) return;
+
+    var selectedInterface = interfaceSelect.value;
+    var models = model_params[selectedInterface] ? model_params[selectedInterface].split(',').map(m => m.trim()) : [];
+    
+    modelSelect.innerHTML = '';
+    models.forEach((model) => {
+        var option = document.createElement('option');
+        option.value = model;
+        option.textContent = model;
+        modelSelect.appendChild(option);
+    });
+}
 
 // 文件上传处理
 document.addEventListener('DOMContentLoaded', function() {
@@ -252,49 +292,55 @@ document.addEventListener('DOMContentLoaded', function() {
             fileInput.click();
         });
 
-fileInput.addEventListener('change', function() {
-    const files = Array.from(fileInput.files);
-    files.forEach(file => {
-        const formData = new FormData();
-        formData.append('action', 'deepseek_upload_file');
-        formData.append('file', file);
-        formData.append('nonce', file_upload_nonce);
-        formData.append('interface', document.getElementById('chat-interface-select')?.value || 'qwen');
+        fileInput.addEventListener('change', function() {
+            const files = Array.from(fileInput.files);
+            const interfaceSelect = document.getElementById('chat-interface-select');
+            const modelSelect = document.getElementById('chat-model-select');
+            const currentInterface = interfaceSelect ? interfaceSelect.value : 'qwen';
+            const currentModel = modelSelect ? modelSelect.value : '';
 
-        fetch(adminAjaxUrl, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                uploadedFiles.push({
-                    file_id: data.data.file_id,
-                    filename: data.data.filename,
-                    interface: data.data.interface
-                });
-                if (uploadedFiles.length > 0) {
-                    filesList.style.display = 'flex';
-                }
-                updateUploadedFilesList();
-            } else {
-                let errorMsg = '文件上传失败';
-                if (data.data && data.data.message) {
-                    errorMsg = data.data.message;
-                    if (data.data.type === 'invalid_type') {
-                        errorMsg += ` 支持的类型: ${data.data.allowed_types}`;
+            files.forEach(file => {
+                const formData = new FormData();
+                formData.append('action', 'deepseek_upload_file');
+                formData.append('file', file);
+                formData.append('nonce', file_upload_nonce);
+                formData.append('interface', currentInterface);
+                formData.append('model', currentModel);
+
+                fetch(adminAjaxUrl, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        uploadedFiles.push({
+                            file_id: data.data.file_id,
+                            filename: data.data.filename,
+                            interface: data.data.interface
+                        });
+                        if (uploadedFiles.length > 0) {
+                            filesList.style.display = 'flex';
+                        }
+                        updateUploadedFilesList();
+                    } else {
+                        let errorMsg = '文件上传失败';
+                        if (data.data && data.data.message) {
+                            errorMsg = data.data.message;
+                            if (data.data.type === 'invalid_type') {
+                                errorMsg += ` 支持的类型: ${data.data.allowed_types}`;
+                            }
+                        }
+                        showCustomNotification(errorMsg, 'error');
                     }
-                }
-                showCustomNotification(errorMsg, 'error');
-            }
-        })
-        .catch(error => {
-            console.error('文件上传错误:', error);
-            showCustomNotification('文件上传错误: 网络问题', 'error');
+                })
+                .catch(error => {
+                    console.error('文件上传错误:', error);
+                    showCustomNotification('文件上传错误: 网络问题', 'error');
+                });
+            });
+            fileInput.value = '';
         });
-    });
-    fileInput.value = '';
-});
     }
 });
 
@@ -311,7 +357,7 @@ function updateUploadedFilesList() {
             uploadedFiles.splice(index, 1);
             updateUploadedFilesList();
             if (uploadedFiles.length === 0) {
-                filesList.style.display = 'none'; // 所有文件删除后隐藏
+                filesList.style.display = 'none';
             }
         });
         fileItem.appendChild(removeBtn);
@@ -319,281 +365,299 @@ function updateUploadedFilesList() {
     });
 }
 
-// 发送消息
-document.getElementById('deepseek-chat-send').addEventListener('click', function() {
+// 处理发送消息
+function handleSendMessage() {
     var message = document.getElementById('deepseek-chat-input').value.trim();
-    // 如果没有消息且没有上传文件，则不执行发送
     if (!message && uploadedFiles.length === 0) return;
 
     if (currentAppId) {
-        sendAgentMessage(message, currentAppId); // 如果是智能体消息，走原有逻辑
+        sendAgentMessage(message, currentAppId);
     } else {
-        var newConversation = !currentConversationId;
-        var currentMessage = message;
-
-        var messagesContainer = document.getElementById('deepseek-chat-messages');
-        var thinkingMessage = document.createElement('div');
-        thinkingMessage.id = 'deepseek-thinking-message';
-        thinkingMessage.className = 'message-bubble bot';
-        thinkingMessage.innerHTML = '小助手正在思考中...';
-        messagesContainer.appendChild(thinkingMessage);
-
-        var enableSearchSwitch = document.getElementById('enable-search');
-        var enableSearch = enableSearchSwitch ? enableSearchSwitch.checked : false;
-
-        // 显示用户消息和已上传文件
-        if (message || uploadedFiles.length > 0) {
-            var userMessageContainer = document.createElement('div');
-            userMessageContainer.classList.add('message-bubble', 'user');
-            if (message) {
-                userMessageContainer.textContent = message;
-            }
-            if (uploadedFiles.length > 0) {
-                var fileList = document.createElement('div');
-                fileList.className = 'uploaded-files-preview';
-                uploadedFiles.forEach(file => {
-                    var fileItem = document.createElement('span');
-                    fileItem.textContent = `已上传: ${file.filename}`;
-                    fileList.appendChild(fileItem);
-                });
-                userMessageContainer.appendChild(fileList);
-            }
-            thinkingMessage.insertAdjacentElement('beforebegin', userMessageContainer);
-        }
-
-        fetch(restUrl, {
+        fetch(adminAjaxUrl, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'X-WP-Nonce': deepseek_rest_nonce
+                'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: JSON.stringify({
-                message: message,
-                conversation_id: currentConversationId,
-                enable_search: enableSearch,
-                file_ids: uploadedFiles.length > 0 ? JSON.stringify(uploadedFiles) : null // 发送已上传文件信息
-            })
+            body: 'action=deepseek_get_current_interface'
         })
-        .then(response => {
-            const contentType = response.headers.get('Content-Type') || '';
-            if (contentType.indexOf('application/json') !== -1) {
-                return response.json().then(data => ({ data, isJson: true }));
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const currentInterface = data.interface;
+                const modelSelect = document.getElementById('chat-model-select');
+                const currentModel = modelSelect ? modelSelect.value : '';
+                sendMessage(message, currentInterface, currentModel);
             } else {
-                return { response };
-            }
-        })
-        .then(result => {
-            if (result.isJson) {
-                var data = result.data;
-                if (data.success && data.is_image) {
-                    handleImageGeneration(data.task_id);
-                    if (!currentConversationId) {
-                        var historyContainer = document.querySelector('#deepseek-chat-history ul');
-                        var newChatItem = document.createElement('li');
-                        newChatItem.setAttribute('data-conversation-id', data.conversation_id);
-                        newChatItem.innerHTML = '<span class="deepseek-chat-title">' + data.conversation_title + '</span>' +
-                            '<button class="deepseek-delete-log" data-conversation-id="' + data.conversation_id + '">删除</button>';
-                        historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
-
-                        newChatItem.addEventListener('click', function() {
-                            loadChatLog(data.conversation_id);
-                        });
-
-                        newChatItem.querySelector('.deepseek-delete-log').addEventListener('click', function(e) {
-                            e.stopPropagation();
-                            var conversationId = this.getAttribute('data-conversation-id');
-                            fetch(adminAjaxUrl, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/x-www-form-urlencoded',
-                                },
-                                body: 'action=deepseek_delete_log&conversation_id=' + conversationId
-                            }).then(response => response.json())
-                            .then(data => {
-                                if (data.success) {
-                                    this.parentElement.remove();
-                                    document.getElementById('deepseek-chat-messages').innerHTML = '';
-                                    setCurrentConversationId(null);
-                                }
-                            });
-                        });
-
-                        setCurrentConversationId(data.conversation_id);
-                    }
-                }
-            } else {
-                thinkingMessage.remove();
-
-                // 创建 bot 消息容器
-                var botMessageContainer = document.createElement('div');
-                botMessageContainer.classList.add('message-bubble', 'bot');
-
-                // 推理过程和最终回答的子容器
-                var reasoningContainer = document.createElement('div');
-                reasoningContainer.classList.add('reasoning-content');
-                reasoningContainer.innerHTML = '<strong>推理过程：</strong><br>';
-                reasoningContainer.style.display = 'none'; // 默认隐藏推理过程
-
-                var contentContainer = document.createElement('div');
-                contentContainer.classList.add('final-content');
-
-                botMessageContainer.appendChild(reasoningContainer);
-                botMessageContainer.appendChild(contentContainer);
-                messagesContainer.appendChild(botMessageContainer);
-
-                const reader = result.response.body.getReader();
-                const decoder = new TextDecoder();
-                let reasoningReply = '';
-                let contentReply = '';
-
-                function processStream() {
-                    reader.read().then(({ done, value }) => {
-                        if (done) {
-                            // 如果有推理过程，则显示推理容器
-                            if (reasoningReply) {
-                                reasoningContainer.innerHTML = '<strong>推理过程：</strong><br>' + convertMarkdownToHTML(reasoningReply);
-                                reasoningContainer.style.display = 'block';
-                            }
-                            // 最终回答始终显示
-                            contentContainer.innerHTML = convertMarkdownToHTML(contentReply);
-                            addCopyButtonsToPreTags(botMessageContainer);
-                            addVoicePlayback(botMessageContainer, contentReply);
-                            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                            document.getElementById('deepseek-chat-input').value = '';
-                            //uploadedFiles = []; // 清空已上传文件列表
-                            updateUploadedFilesList(); // 更新文件列表显示
-                            return;
-                        }
-                        const chunk = decoder.decode(value, { stream: true });
-                        const lines = chunk.split('\n');
-                        lines.forEach(line => {
-                            line = line.trim();
-                            if (line.startsWith('data: ')) {
-                                const dataPart = line.substring(6).trim();
-                                if (dataPart === '[DONE]') return;
-                                try {
-                                    const jsonData = JSON.parse(dataPart);
-                                    if (jsonData.conversation_id) {
-                                        if (newConversation) {
-                                            setCurrentConversationId(jsonData.conversation_id);
-                                            var historyContainer = document.querySelector('#deepseek-chat-history ul');
-                                            var newChatItem = document.createElement('li');
-                                            newChatItem.setAttribute('data-conversation-id', jsonData.conversation_id);
-                                            newChatItem.innerHTML = '<span class="deepseek-chat-title">' + currentMessage + '</span>' +
-                                                '<button class="deepseek-delete-log" data-conversation-id="' + jsonData.conversation_id + '">删除</button>';
-                                            historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
-
-                                            newChatItem.addEventListener('click', function() {
-                                                loadChatLog(jsonData.conversation_id);
-                                            });
-
-                                            newChatItem.querySelector('.deepseek-delete-log').addEventListener('click', function(e) {
-                                                e.stopPropagation();
-                                                var conversationId = this.getAttribute('data-conversation-id');
-                                                fetch(adminAjaxUrl, {
-                                                    method: 'POST',
-                                                    headers: {
-                                                        'Content-Type': 'application/x-www-form-urlencoded',
-                                                    },
-                                                    body: 'action=deepseek_delete_log&conversation_id=' + conversationId
-                                                }).then(response => response.json())
-                                                .then(data => {
-                                                    if (data.success) {
-                                                        this.parentElement.remove();
-                                                        document.getElementById('deepseek-chat-messages').innerHTML = '';
-                                                        setCurrentConversationId(null);
-                                                    }
-                                                });
-                                            });
-                                            newConversation = false;
-                                        }
-                                        return;
-                                    }
-                                    if (jsonData.choices && jsonData.choices.length > 0) {
-                                        let delta = jsonData.choices[0].delta;
-                                        if (delta.reasoning_content) {
-                                            reasoningReply += delta.reasoning_content;
-                                            reasoningContainer.innerHTML = '<strong>推理过程：</strong><br>' + convertMarkdownToHTML(reasoningReply);
-                                            reasoningContainer.style.display = 'block'; // 有内容时显示
-                                        }
-                                        if (delta.content) {
-                                            contentReply += delta.content;
-                                            contentContainer.innerHTML = convertMarkdownToHTML(contentReply);
-                                        }
-                                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                                    }
-                                } catch (e) {
-                                    console.error('解析SSE错误:', e, '原始数据:', dataPart);
-                                }
-                            }
-                        });
-                        processStream();
-                    });
-                }
-                processStream();
+                console.error('获取当前接口失败:', data.message);
+                showCustomNotification('获取当前接口失败', 'error');
             }
         })
         .catch(error => {
-            console.error('Fetch request failed:', error);
-            var errorMsg = document.getElementById('deepseek-thinking-message');
-            if (errorMsg) errorMsg.innerHTML = '网络错误，请稍后重试';
+            console.error('获取接口失败:', error);
+            showCustomNotification('获取接口失败', 'error');
         });
     }
-});
+}
 
-// 图片生成处理函数
+// 发送消息
+function sendMessage(message, currentInterface, currentModel) {
+    var newConversation = !currentConversationId;
+    var currentMessage = message;
+
+    var messagesContainer = document.getElementById('deepseek-chat-messages');
+    var thinkingMessage = document.createElement('div');
+    thinkingMessage.id = 'deepseek-thinking-message';
+    thinkingMessage.className = 'message-bubble bot';
+    thinkingMessage.innerHTML = '小助手正在思考中...';
+    messagesContainer.appendChild(thinkingMessage);
+
+    var enableSearchSwitch = document.getElementById('enable-search');
+    var enableSearch = enableSearchSwitch ? enableSearchSwitch.checked : false;
+
+    if (message || uploadedFiles.length > 0) {
+        var userMessageContainer = document.createElement('div');
+        userMessageContainer.classList.add('message-bubble', 'user');
+        if (message) {
+            userMessageContainer.textContent = message;
+        }
+        if (uploadedFiles.length > 0) {
+            var fileList = document.createElement('div');
+            fileList.className = 'uploaded-files-preview';
+            uploadedFiles.forEach(file => {
+                var fileItem = document.createElement('span');
+                fileItem.textContent = `已上传: ${file.filename}`;
+                fileList.appendChild(fileItem);
+            });
+            userMessageContainer.appendChild(fileList);
+        }
+        thinkingMessage.insertAdjacentElement('beforebegin', userMessageContainer);
+    }
+
+    fetch(restUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-WP-Nonce': deepseek_rest_nonce
+        },
+        body: JSON.stringify({
+            message: message,
+            conversation_id: currentConversationId,
+            enable_search: enableSearch,
+            file_ids: uploadedFiles.length > 0 ? JSON.stringify(uploadedFiles) : null,
+            interface: currentInterface,
+            model: currentModel
+        })
+    })
+    .then(response => {
+        const contentType = response.headers.get('Content-Type') || '';
+        if (contentType.indexOf('application/json') !== -1) {
+            return response.json().then(data => ({ data, isJson: true }));
+        } else {
+            return { response };
+        }
+    })
+    .then(result => {
+        if (result.isJson) {
+            var data = result.data;
+            if (!data.success) {
+                thinkingMessage.innerHTML = data.message || '请求失败';
+                return;
+            }
+            if (data.success && data.is_image) {
+                handleImageGeneration(data.task_id);
+                if (!currentConversationId) {
+                    var historyContainer = document.querySelector('#deepseek-chat-history ul');
+                    var newChatItem = document.createElement('li');
+                    newChatItem.setAttribute('data-conversation-id', data.conversation_id);
+                    newChatItem.innerHTML = '<span class="deepseek-chat-title">' + data.conversation_title + '</span>' +
+                        '<button class="deepseek-delete-log" data-conversation-id="' + data.conversation_id + '">删除</button>';
+                    historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
+
+                    newChatItem.addEventListener('click', function() {
+                        loadChatLog(data.conversation_id);
+                    });
+
+                    newChatItem.querySelector('.deepseek-delete-log').addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        var conversationId = this.getAttribute('data-conversation-id');
+                        fetch(adminAjaxUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                            },
+                            body: 'action=deepseek_delete_log&conversation_id=' + conversationId
+                        }).then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                this.parentElement.remove();
+                                document.getElementById('deepseek-chat-messages').innerHTML = '';
+                                setCurrentConversationId(null);
+                            }
+                        });
+                    });
+
+                    setCurrentConversationId(data.conversation_id);
+                }
+            }
+        } else {
+            thinkingMessage.remove();
+
+            var botMessageContainer = document.createElement('div');
+            botMessageContainer.classList.add('message-bubble', 'bot');
+
+            var reasoningContainer = document.createElement('div');
+            reasoningContainer.classList.add('reasoning-content');
+            reasoningContainer.innerHTML = '<strong>推理过程：</strong><br>';
+            reasoningContainer.style.display = 'none';
+
+            var contentContainer = document.createElement('div');
+            contentContainer.classList.add('final-content');
+
+            botMessageContainer.appendChild(reasoningContainer);
+            botMessageContainer.appendChild(contentContainer);
+            messagesContainer.appendChild(botMessageContainer);
+
+            const reader = result.response.body.getReader();
+            const decoder = new TextDecoder();
+            let reasoningReply = '';
+            let contentReply = '';
+
+            function processStream() {
+                reader.read().then(({ done, value }) => {
+                    if (done) {
+                        if (reasoningReply) {
+                            reasoningContainer.innerHTML = '<strong>推理过程：</strong><br>' + convertMarkdownToHTML(reasoningReply);
+                            reasoningContainer.style.display = 'block';
+                        }
+                        contentContainer.innerHTML = convertMarkdownToHTML(contentReply);
+                        addCopyButtonsToPreTags(botMessageContainer);
+                        addVoicePlayback(botMessageContainer, contentReply);
+                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                        document.getElementById('deepseek-chat-input').value = '';
+                        //uploadedFiles = []; // 清空已上传文件
+                        updateUploadedFilesList();
+                        return;
+                    }
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n');
+                    lines.forEach(line => {
+                        line = line.trim();
+                        if (line.startsWith('data: ')) {
+                            const dataPart = line.substring(6).trim();
+                            if (dataPart === '[DONE]') return;
+                            try {
+                                const jsonData = JSON.parse(dataPart);
+                                if (jsonData.conversation_id) {
+                                    if (newConversation) {
+                                        setCurrentConversationId(jsonData.conversation_id);
+                                        var historyContainer = document.querySelector('#deepseek-chat-history ul');
+                                        var newChatItem = document.createElement('li');
+                                        newChatItem.setAttribute('data-conversation-id', jsonData.conversation_id);
+                                        newChatItem.innerHTML = '<span class="deepseek-chat-title">' + currentMessage + '</span>' +
+                                            '<button class="deepseek-delete-log" data-conversation-id="' + jsonData.conversation_id + '">删除</button>';
+                                        historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
+
+                                        newChatItem.addEventListener('click', function() {
+                                            loadChatLog(jsonData.conversation_id);
+                                        });
+
+                                        newChatItem.querySelector('.deepseek-delete-log').addEventListener('click', function(e) {
+                                            e.stopPropagation();
+                                            var conversationId = this.getAttribute('data-conversation-id');
+                                            fetch(adminAjaxUrl, {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/x-www-form-urlencoded',
+                                                },
+                                                body: 'action=deepseek_delete_log&conversation_id=' + conversationId
+                                            }).then(response => response.json())
+                                            .then(data => {
+                                                if (data.success) {
+                                                    this.parentElement.remove();
+                                                    document.getElementById('deepseek-chat-messages').innerHTML = '';
+                                                    setCurrentConversationId(null);
+                                                }
+                                            });
+                                        });
+                                        newConversation = false;
+                                    }
+                                    return;
+                                }
+                                if (jsonData.choices && jsonData.choices.length > 0) {
+                                    let delta = jsonData.choices[0].delta;
+                                    if (delta.reasoning_content) {
+                                        reasoningReply += delta.reasoning_content;
+                                        reasoningContainer.innerHTML = '<strong>推理过程：</strong><br>' + convertMarkdownToHTML(reasoningReply);
+                                        reasoningContainer.style.display = 'block';
+                                    }
+                                    if (delta.content) {
+                                        contentReply += delta.content;
+                                        contentContainer.innerHTML = convertMarkdownToHTML(contentReply);
+                                    }
+                                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                                }
+                            } catch (e) {
+                                console.error('解析SSE错误:', e, '原始数据:', dataPart);
+                            }
+                        }
+                    });
+                    processStream();
+                });
+            }
+            processStream();
+        }
+    })
+    .catch(error => {
+        console.error('Fetch request failed:', error);
+        var errorMsg = document.getElementById('deepseek-thinking-message');
+        if (errorMsg) errorMsg.innerHTML = '网络错误，请稍后重试';
+    });
+}
+
+// 处理图像生成
 function handleImageGeneration(taskId) {
     var messagesContainer = document.getElementById('deepseek-chat-messages');
-    var thinkingMessage = document.getElementById('deepseek-thinking-message');
-    if (thinkingMessage) thinkingMessage.remove();
+    var imageMessage = document.getElementById('deepseek-thinking-message');
+    imageMessage.innerHTML = '图片生成中...';
 
-    var userMessage = document.createElement('div');
-    userMessage.className = 'message-bubble user';
-    userMessage.textContent = document.getElementById('deepseek-chat-input').value;
-    messagesContainer.appendChild(userMessage);
-
-    var loadingContainer = document.createElement('div');
-    loadingContainer.className = 'message-bubble bot';
-    loadingContainer.innerHTML = '图片生成中...';
-    messagesContainer.appendChild(loadingContainer);
-
-    var checkInterval = setInterval(function() {
+    var checkStatus = setInterval(() => {
         fetch(adminAjaxUrl, {
             method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
             body: 'action=deepseek_check_image_task&task_id=' + taskId
-        }).then(response => response.json())
+        })
+        .then(response => response.json())
         .then(data => {
-            if (data.task_status === 'SUCCEEDED') {
-                clearInterval(checkInterval);
-                loadingContainer.remove();
+            if (data.success && data.task_status === 'SUCCEEDED') {
+                clearInterval(checkStatus);
+                imageMessage.remove();
 
-                var botMessage = document.createElement('div');
-                botMessage.className = 'message-bubble bot';
-                var promptContainer = document.createElement('div');
-                promptContainer.className = 'image-prompt';
-                botMessage.appendChild(promptContainer);
-                var imageContainer = document.createElement('img');
-                imageContainer.src = data.image_url;
-                imageContainer.style.maxWidth = '100%';
-                imageContainer.style.height = 'auto';
-                botMessage.appendChild(imageContainer);
-                messagesContainer.appendChild(botMessage);
+                var botMessageContainer = document.createElement('div');
+                botMessageContainer.classList.add('message-bubble', 'bot');
+                var img = document.createElement('img');
+                img.src = data.image_url;
+                img.alt = data.actual_prompt || 'Generated Image';
+                img.style.maxWidth = '100%';
+                botMessageContainer.appendChild(img);
 
-                var actualPrompt = data.actual_prompt;
-                var index = 0;
-                var typingSpeed = 50;
+                var promptText = document.createElement('p');
+                promptText.textContent = '生成提示词: ' + data.actual_prompt;
+                botMessageContainer.appendChild(promptText);
 
-                function typeWriter() {
-                    if (index < actualPrompt.length) {
-                        promptContainer.innerHTML += actualPrompt.charAt(index);
-                        index++;
-                        setTimeout(typeWriter, typingSpeed);
-                    }
-                }
-                typeWriter();
+                messagesContainer.appendChild(botMessageContainer);
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                document.getElementById('deepseek-chat-input').value = '';
+            } else if (!data.success) {
+                clearInterval(checkStatus);
+                imageMessage.innerHTML = '图片生成失败';
             }
+        })
+        .catch(error => {
+            console.error('检查任务状态失败:', error);
+            clearInterval(checkStatus);
+            imageMessage.innerHTML = '检查任务状态失败';
         });
     }, 2000);
 }
@@ -616,7 +680,7 @@ function typeWriter(text, container, callback) {
     addChar();
 }
 
-// 开启新对话时，清空消息区和 localStorage 中的当前对话 ID
+// 开启新对话
 document.getElementById('deepseek-new-chat').addEventListener('click', function() {
     document.getElementById('deepseek-chat-messages').innerHTML = '';
     document.getElementById('deepseek-chat-input').value = '';
@@ -655,7 +719,7 @@ function addCopyButtonsToPreTags(container) {
     });
 }
 
-// 加载历史对话记录时的内容渲染
+// 加载历史对话记录
 function loadChatLog(conversationId) {
     fetch(adminAjaxUrl + '?action=deepseek_load_log&conversation_id=' + conversationId)
     .then(response => response.json())
@@ -665,17 +729,13 @@ function loadChatLog(conversationId) {
             messagesContainer.innerHTML = '';
             const fragment = document.createDocumentFragment();
             data.messages.forEach(message => {
-                // 用户消息
                 const userMessage = document.createElement('div');
                 userMessage.classList.add('message-bubble', 'user');
                 userMessage.textContent = message.message;
                 fragment.appendChild(userMessage);
 
-                // AI回复
                 const botMessageElement = document.createElement('div');
                 botMessageElement.classList.add('message-bubble', 'bot');
-
-                // 检查response是否为对象（文本消息）或字符串（图片消息）
                 if (typeof message.response === 'object') {
                     const { content, reasoning_content } = message.response;
                     let html = '';
@@ -687,15 +747,11 @@ function loadChatLog(conversationId) {
                     }
                     botMessageElement.innerHTML = html;
                 } else {
-                    // 图片消息，直接使用返回的HTML
                     botMessageElement.innerHTML = message.response;
                 }
-
                 fragment.appendChild(botMessageElement);
-
-                // 添加复制按钮和语音播放
                 addCopyButtonsToPreTags(botMessageElement);
-                const responseText = botMessageElement.textContent; // 提取纯文本用于语音
+                const responseText = botMessageElement.textContent;
                 addVoicePlayback(botMessageElement, responseText);
             });
             messagesContainer.appendChild(fragment);
@@ -864,28 +920,23 @@ function showClearConfirmation(container) {
     });
 }
 
-// 清除对话
 // 显示自定义提示框
 function showCustomNotification(message, type = 'error') {
-    // 创建提示框容器
     const notification = document.createElement('div');
     notification.className = `custom-notification ${type}`;
     notification.textContent = message;
 
-    // 添加关闭按钮
     const closeButton = document.createElement('span');
     closeButton.className = 'close-notification';
-    closeButton.innerHTML = '&times;';
+    closeButton.innerHTML = '×';
     closeButton.onclick = () => notification.remove();
     notification.appendChild(closeButton);
 
-    // 添加到页面
     document.body.appendChild(notification);
 
-    // 自动消失
     setTimeout(() => {
         notification.remove();
-    }, 2000); // 2秒后自动消失
+    }, 2000);
 }
 
 // 清除对话
@@ -912,7 +963,7 @@ function clearConversation(container) {
     .then(data => {
         if (data.success) {
             container.innerHTML = '';
-            loadAgentChat(appId); // 重新加载当前智能体对话页面
+            loadAgentChat(appId);
             showCustomNotification('对话记录清除成功', 'success');
             console.log('对话记录清除成功');
         } else {
@@ -1010,7 +1061,6 @@ function loadAgentChat(appId) {
 function sendAgentMessage(message, appId) {
     var messagesContainer = document.getElementById('deepseek-chat-messages');
     
-    // 添加智能体头部信息
     if (!messagesContainer.querySelector('.agent-header')) {
         fetch(adminAjaxUrl + '?action=deepseek_get_agents')
         .then(response => response.json())
@@ -1025,19 +1075,18 @@ function sendAgentMessage(message, appId) {
                         <span class="agent-name">${agent.name}</span>
                     `;
                     messagesContainer.insertBefore(headerContainer, messagesContainer.firstChild);
-                    messagesContainer.scrollTop = messagesContainer.scrollHeight; // 确保头部添加后滚动到底部
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
                 }
             }
         });
     }
 
-    // 添加用户消息
     messagesContainer.innerHTML += '<div class="message-bubble user">' + message + '</div>';
     var botMessageContainer = document.createElement('div');
     botMessageContainer.classList.add('message-bubble', 'bot');
     botMessageContainer.textContent = '智能体应用正在处理...';
     messagesContainer.appendChild(botMessageContainer);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight; // 用户消息添加后立即滚动到底部
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
     const agentUrl = restUrl.replace('send-message', 'send-agent-message');
 
@@ -1067,7 +1116,7 @@ function sendAgentMessage(message, appId) {
                     botMessageContainer.innerHTML = convertMarkdownToHTML(botReply);
                     addCopyButtonsToPreTags(botMessageContainer);
                     addVoicePlayback(botMessageContainer, botReply);
-                    messagesContainer.scrollTop = messagesContainer.scrollHeight; // 完成后确保滚动到底部
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
                     document.getElementById('deepseek-chat-input').value = '';
                     return;
                 }
@@ -1088,7 +1137,6 @@ function sendAgentMessage(message, appId) {
                             if (jsonData.text) {
                                 botReply += jsonData.text;
                                 botMessageContainer.innerHTML = convertMarkdownToHTML(botReply);
-                                // 每次更新内容时立即滚动到底部
                                 botMessageContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
                             }
                         } catch (e) {
@@ -1115,7 +1163,6 @@ function toggleClearButtonVisibility() {
         clearButton.style.display = currentPage === 'agent' ? 'block' : 'none';
     }
 }
-
 
 // 在页面加载时初始化按钮显示
 window.addEventListener('load', function() {

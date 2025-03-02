@@ -423,7 +423,7 @@ function deepseek_render_agents_page() {
         </form>
         <div class="success-message" <?php echo $saved ? 'style="display: block;"' : ''; ?>>设置已保存</div>
         <p>支持阿里、腾讯、火山引擎和扣子平台的智能体应用。阿里API Key就是百炼里面的，腾讯需为每个智能体单独设置Token，火山引擎和模型apikey一样，扣子的个人访问令牌Token需定期更换。
-            <br>暂时只支持普通对话，部分插件可能也不支持</p>
+            <br>暂时只支持普通对话，部分插件可能不支持，已测试支持联网搜索插件。</p>
     </div>
 
     <?php if ($saved) : ?>

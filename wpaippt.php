@@ -163,7 +163,7 @@ function wpaippt_settings_page() {
                         <span class="description">例如: 800px</span>
                     </td>
                 </tr>
-                <!-- 新增会员验证设置 -->
+                <!-- 会员验证设置 -->
                 <tr valign="top">
                     <th scope="row">启用网站会员验证</th>
                     <td>

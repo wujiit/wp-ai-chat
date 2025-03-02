@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 3.9.1
+Version: 3.9.5
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -189,29 +189,28 @@ add_action('admin_menu', 'deepseek_add_menu');
 // 注册设置
 function deepseek_register_settings() {
     register_setting('deepseek_chat_options_group', 'deepseek_api_key'); // DeepSeek API Key
-    register_setting('deepseek_chat_options_group', 'deepseek_model'); // DeepSeek 模型选择
+    register_setting('deepseek_chat_options_group', 'deepseek_model', array('sanitize_callback' => 'sanitize_text_field')); // DeepSeek 模型参数
     register_setting('deepseek_chat_options_group', 'doubao_api_key'); // 豆包AI API Key
-    register_setting('deepseek_chat_options_group', 'doubao_model'); // 豆包AI 模型参数
+    register_setting('deepseek_chat_options_group', 'doubao_model', array('sanitize_callback' => 'sanitize_text_field')); // 豆包AI 模型参数
     register_setting('deepseek_chat_options_group', 'kimi_api_key'); // kimi AI API Key
-    register_setting('deepseek_chat_options_group', 'kimi_model'); // kimi AI 模型参数
+    register_setting('deepseek_chat_options_group', 'kimi_model', array('sanitize_callback' => 'sanitize_text_field')); // kimi AI 模型参数
     register_setting('deepseek_chat_options_group', 'openai_api_key'); // openai API Key
-    register_setting('deepseek_chat_options_group', 'openai_model'); // openai 模型参数
+    register_setting('deepseek_chat_options_group', 'openai_model', array('sanitize_callback' => 'sanitize_text_field')); // openai 模型参数
     register_setting('deepseek_chat_options_group', 'grok_api_key'); // grok API Key
-    register_setting('deepseek_chat_options_group', 'grok_model'); // grok 模型参数    
+    register_setting('deepseek_chat_options_group', 'grok_model', array('sanitize_callback' => 'sanitize_text_field')); // grok 模型参数
     register_setting('deepseek_chat_options_group', 'qianfan_api_key'); // 千帆 API Key
-    register_setting('deepseek_chat_options_group', 'qianfan_model'); // 千帆 模型参数
+    register_setting('deepseek_chat_options_group', 'qianfan_model', array('sanitize_callback' => 'sanitize_text_field')); // 千帆 模型参数
     register_setting('deepseek_chat_options_group', 'hunyuan_api_key'); // 腾讯混元 API Key
-    register_setting('deepseek_chat_options_group', 'hunyuan_model'); // 腾讯混元 模型参数    
+    register_setting('deepseek_chat_options_group', 'hunyuan_model', array('sanitize_callback' => 'sanitize_text_field')); // 腾讯混元 模型参数
     // 通义千问文本和图像
     register_setting('deepseek_chat_options_group', 'qwen_api_key'); // 通义千问 API Key
-    register_setting('deepseek_chat_options_group', 'qwen_text_model'); // 通义千问 文本模型
-    register_setting('deepseek_chat_options_group', 'qwen_image_model'); // 通义千问 图像模型
-    register_setting('deepseek_chat_options_group', 'qwen_enable_image'); // 通义千问图片生成复选框
+    register_setting('deepseek_chat_options_group', 'qwen_text_model', array('sanitize_callback' => 'sanitize_text_field')); // 通义千问 文本模型
+    register_setting('deepseek_chat_options_group', 'qwen_image_model', array('sanitize_callback' => 'sanitize_text_field')); // 通义千问 图像模型
     register_setting('deepseek_chat_options_group', 'qwen_enable_search'); // 通义千问联网搜索
 
     // 自定义模型设置
     register_setting('deepseek_chat_options_group', 'custom_api_key');       // 自定义模型API Key
-    register_setting('deepseek_chat_options_group', 'custom_model_params');    // 自定义模型参数
+    register_setting('deepseek_chat_options_group', 'custom_model_params', array('sanitize_callback' => 'sanitize_text_field')); // 自定义模型参数
     register_setting('deepseek_chat_options_group', 'custom_model_url');       // 自定义模型请求 URL
 
     register_setting('deepseek_chat_options_group', 'show_ai_helper'); // ai助手显示
@@ -257,7 +256,7 @@ function deepseek_register_settings() {
 
     // DeepSeek配置项
     add_settings_field('deepseek_api_key', 'DeepSeek API Key', 'deepseek_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
-    add_settings_field('deepseek_model', 'DeepSeek 模型', 'deepseek_model_callback', 'deepseek-chat', 'deepseek_main_section');
+    add_settings_field('deepseek_model', 'DeepSeek 模型参数', 'deepseek_model_callback', 'deepseek-chat', 'deepseek_main_section');
 
     // 豆包AI配置项
     add_settings_field('doubao_api_key', '豆包AI API Key', 'doubao_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
@@ -285,10 +284,9 @@ function deepseek_register_settings() {
 
     // 通义千问配置项
     add_settings_field('qwen_api_key', '通义千问 API Key', 'qwen_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
-    add_settings_field('qwen_text_model', '通义千问 文本模型', 'qwen_text_model_callback', 'deepseek-chat', 'deepseek_main_section');
-    add_settings_field('qwen_image_model', '通义千问 图像模型', 'qwen_image_model_callback', 'deepseek-chat', 'deepseek_main_section');
+    add_settings_field('qwen_text_model', '通义千问 文本模型参数', 'qwen_text_model_callback', 'deepseek-chat', 'deepseek_main_section');
+    add_settings_field('qwen_image_model', '通义千问 图像模型参数', 'qwen_image_model_callback', 'deepseek-chat', 'deepseek_main_section');
     add_settings_field('qwen_enable_search', '启用通义千问联网搜索', 'qwen_enable_search_callback', 'deepseek-chat', 'deepseek_main_section');
-    add_settings_field('qwen_enable_image', '启用通义千问图片生成', 'qwen_enable_image_callback', 'deepseek-chat', 'deepseek_main_section');
 
     // 自定义模型配置项
     add_settings_field('custom_api_key', '自定义模型 API Key', 'custom_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
@@ -416,7 +414,7 @@ function chat_interfaces_callback() {
         'custom' => '自定义接口'
     );
     ?>
-    <select name="chat_interfaces[]" multiple style="height: 150px;">
+    <select name="chat_interfaces[]" multiple style="height: 190px;">
         <?php foreach ($interfaces as $value => $label): ?>
             <option value="<?php echo esc_attr($value); ?>" <?php echo in_array($value, $options) ? 'selected' : ''; ?>>
                 <?php echo esc_html($label); ?>
@@ -477,7 +475,7 @@ function summary_interface_choice_callback() {
         <option value="hunyuan" <?php selected($choice, 'hunyuan'); ?>>腾讯混元</option>
         <option value="custom" <?php selected($choice, 'custom'); ?>>自定义接口</option>
     </select>
-    <p class="description">选择用于生成文章总结的AI接口，需要长文本模型</p>
+    <p class="description">选择用于生成文章总结的AI接口，需要长文本模型，多模型参数默认采用第一个</p>
     <?php
 }
 
@@ -536,7 +534,6 @@ function ai_tutorial_url_callback() {
 function deepseek_custom_prompts_callback() {
     $prompts = get_option('deepseek_custom_prompts', '');
     echo '<textarea name="deepseek_custom_prompts" rows="5" cols="60" placeholder="每行一个提示词">' . esc_textarea($prompts) . '</textarea>';
-    echo '<p class="description" style="color: red;">如果开启了图片生成，把这句加进提示词:  请帮我生成一张图片</p>';
 }
 
 // AI对话语音朗读函数回调
@@ -799,7 +796,8 @@ function deepseek_api_key_callback() {
 // deepseek模型函数回调
 function deepseek_model_callback() {
     $model = get_option('deepseek_model', 'deepseek-chat'); // 默认模型为deepseek-chat
-    echo '<input type="text" name="deepseek_model" value="' . esc_attr($model) . '" style="width: 500px;" />';    
+    echo '<input type="text" name="deepseek_model" value="' . esc_attr($model) . '" style="width: 500px;" />';
+    echo '<p class="description" style="color: red;">多个参数用英文逗号分隔，第一个为默认参数，例如：deepseek-chat,deepseek-coder</p>';    
 }
 
 // 设置页面
@@ -815,7 +813,6 @@ function deepseek_render_settings_page() {
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
-        /* 标题样式 */
         .ai-wrap h1 {
             font-size: 24px;
             color: #23282d;
@@ -823,11 +820,12 @@ function deepseek_render_settings_page() {
             padding-bottom: 10px;
             border-bottom: 2px solid #f0f0f0;
         }
-        /* 表单样式 */
         .ai-wrap form {
             margin-top: 20px;
         }
-        /* 输入框样式 */
+        .ai-wrap th {
+            width: 180px;
+        }        
         .ai-wrap input[type="text"]
         {
             width: 100%;
@@ -840,7 +838,6 @@ function deepseek_render_settings_page() {
             background: #fff;
             transition: border-color 0.3s ease;
         }
-
         .ai-wrap select {
             width: 100%;
             max-width: 500px;
@@ -851,23 +848,19 @@ function deepseek_render_settings_page() {
             color: #333;
             background: #f9f9f9;
         }
-
         .ai-wrap input[type="text"]:focus,
         .ai-wrap select:focus {
             border-color: #0073aa;
             outline: none;
         }
-        /* 复选框样式 */
         .ai-wrap input[type="checkbox"] {
             margin-right: 10px;
         }
-        /* 描述文字样式 */
         .ai-wrap .description {
             font-size: 13px;
             color: #666;
             margin-top: 5px;
         }
-        /* 保存成功提示样式 */
         #deepseek-save-success {
             background: #d4edda;
             color: #155724;
@@ -877,7 +870,6 @@ function deepseek_render_settings_page() {
             border-radius: 5px;
             text-align: center;
         }
-        /* 余额信息样式 */
         .ai-wrap div[style*="margin-top: 20px;"] {
             padding: 15px;
             background: #f9f9f9;
@@ -892,7 +884,6 @@ function deepseek_render_settings_page() {
             background: #f8d7da;
             border-color: #f5c6cb;
         }
-        /* 提交按钮样式 */
         .ai-wrap .button-primary {
             background: #0073aa;
             border-color: #006799;
@@ -974,13 +965,8 @@ function deepseek_enqueue_assets() {
     if (is_singular('page')) {
         global $post;
         if (has_shortcode($post->post_content, 'deepseek_chat')) { // 检查是否包含短代码
-            // 加载CSS
             wp_enqueue_style('deepseek-chat-style', plugin_dir_url(__FILE__) . 'wpai-style.css');
-
-            // 加载marked.min.js
             wp_enqueue_script('marked-js', plugin_dir_url(__FILE__) . 'marked.min.js', array(), null, true);
-
-            // 加载wpai-chat.js
             wp_enqueue_script('deepseek-chat-script', plugin_dir_url(__FILE__) . 'wpai-chat.js', array('marked-js'), null, true);
 
             // 传递PHP变量到JavaScript
@@ -1004,10 +990,8 @@ add_action('wp_enqueue_scripts', 'deepseek_enqueue_assets');
 
 // 处理文件上传的AJAX请求
 function deepseek_handle_file_upload() {
-    // 检查nonce
     check_ajax_referer('file_upload_action', 'nonce');
 
-    // 检查文件是否存在
     if (!isset($_FILES['file'])) {
         wp_send_json_error(['message' => '没有文件被上传']);
         return;
@@ -1018,6 +1002,7 @@ function deepseek_handle_file_upload() {
     $file = $_FILES['file'];
     $file_extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
     $interface = isset($_POST['interface']) ? sanitize_text_field($_POST['interface']) : 'qwen';
+    $model = isset($_POST['model']) ? sanitize_text_field($_POST['model']) : '';
 
     // 验证文件类型
     if (!in_array($file_extension, $allowed_types)) {
@@ -1036,6 +1021,21 @@ function deepseek_handle_file_upload() {
             'type' => 'size_exceeded',
             'max_size' => round($max_size / (1024 * 1024), 2)
         ]);
+        return;
+    }
+
+    // 判断模型是否支持文档分析
+    $support_doc_models = [
+        'kimi' => explode(',', get_option('kimi_model', '')),
+        'openai' => explode(',', get_option('openai_model', '')),
+        'qwen' => ['qwen-long']
+    ];
+    $is_doc_supported = false;
+    if (isset($support_doc_models[$interface])) {
+        $is_doc_supported = in_array($model, $support_doc_models[$interface]);
+    }
+    if (!$is_doc_supported) {
+        wp_send_json_error(['message' => '该模型不支持分析文档']);
         return;
     }
 
@@ -1063,19 +1063,13 @@ function deepseek_handle_file_upload() {
         return;
     }
 
-    // cURL配置
-    $ch = curl_init();
-    if (!$ch) {
-        wp_send_json_error(['message' => 'cURL 初始化失败']);
-        return;
-    }
-
     $cfile = new CURLFile($file['tmp_name'], $file['type'], $file['name']);
     $data = [
         'file' => $cfile,
         'purpose' => 'file-extract'
     ];
 
+    $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $upload_url);
     curl_setopt($ch, CURLOPT_POST, 1);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
@@ -1086,48 +1080,20 @@ function deepseek_handle_file_upload() {
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 600);
 
-    // 只在支持的环境中使用新选项
-    if (defined('CURLOPT_UPLOAD_BUFFERSIZE')) {
-        curl_setopt($ch, CURLOPT_UPLOAD_BUFFERSIZE, 2097152);
-    }
-    if (defined('CURLOPT_BUFFERSIZE')) {
-        curl_setopt($ch, CURLOPT_BUFFERSIZE, 131072);
-    }
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_MAXREDIRS, 10);
-
-    // 执行cURL请求
     $response = curl_exec($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
-    $errno = curl_errno($ch);
     curl_close($ch);
-
-    // 调试日志
-    error_log("File upload attempt: File={$file['name']}, Size={$file['size']}, Interface={$interface}");
-    error_log("cURL Response: HTTP Code={$http_code}, Response=" . substr($response, 0, 200));
-    if ($error) {
-        error_log("cURL Error: {$error}, Errno: {$errno}");
-    }
 
     if ($response === false || $http_code != 200) {
         wp_send_json_error([
-            'message' => '文件上传失败: ' . ($error ?: '未知错误'),
+            'message' => '文件上传失败: ' . (curl_error($ch) ?: '未知错误'),
             'http_code' => $http_code,
-            'response' => substr($response, 0, 200) // 限制长度，避免日志过大
-        ]);
-        return;
-    }
-
-    $response_data = json_decode($response, true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        wp_send_json_error([
-            'message' => 'API返回数据解析失败',
             'response' => substr($response, 0, 200)
         ]);
         return;
     }
 
+    $response_data = json_decode($response, true);
     if (!isset($response_data['id'])) {
         wp_send_json_error([
             'message' => 'API返回数据格式错误',
@@ -1179,12 +1145,21 @@ function deepseek_get_user_interface() {
     return $default_interface;
 }
 
+function deepseek_get_current_interface() {
+    if (!is_user_logged_in()) {
+        wp_send_json_error('请先登录');
+        return;
+    }
+    $current_interface = deepseek_get_user_interface();
+    wp_send_json_success(['interface' => $current_interface]);
+}
+add_action('wp_ajax_deepseek_get_current_interface', 'deepseek_get_current_interface');
 
 // 对话 开始
 function deepseek_chat_shortcode() {
     global $wpdb;
     $table_name = $wpdb->prefix . 'deepseek_chat_logs';
-    $user_id    = get_current_user_id();
+    $user_id = get_current_user_id();
     $show_interface_switch = get_option('show_interface_switch', '0');
     $enabled_interfaces = get_option('chat_interfaces', array('deepseek'));
     $default_interface = get_option('default_chat_interface', 'deepseek');
@@ -1315,6 +1290,10 @@ function deepseek_chat_shortcode() {
                                 ?>
                             </select>
                         </form>
+                        <label for="chat-model-select">选择参数:</label>
+                        <select name="selected_model" id="chat-model-select">
+                            <!-- 模型参数选项动态填充 -->
+                        </select>
                     </div>
                 <?php endif; ?>
 
@@ -1379,6 +1358,18 @@ function deepseek_chat_shortcode() {
     <script type="text/javascript">
         var ajax_nonce = '<?php echo wp_create_nonce("interface_switch_action"); ?>';
         var ajax_url = '<?php echo admin_url("admin-ajax.php"); ?>';
+        var enabled_interfaces = <?php echo json_encode($enabled_interfaces); ?>;
+        var model_params = {
+            'deepseek': '<?php echo get_option('deepseek_model', 'deepseek-chat'); ?>',
+            'doubao': '<?php echo get_option('doubao_model', ''); ?>',
+            'kimi': '<?php echo get_option('kimi_model', ''); ?>',
+            'openai': '<?php echo get_option('openai_model', ''); ?>',
+            'grok': '<?php echo get_option('grok_model', ''); ?>',
+            'qianfan': '<?php echo get_option('qianfan_model', ''); ?>',
+            'hunyuan': '<?php echo get_option('hunyuan_model', ''); ?>',
+            'qwen': '<?php echo get_option('qwen_text_model', 'qwen-max') . ',' . get_option('qwen_image_model', 'wanx2.1-t2i-turbo'); ?>',
+            'custom': '<?php echo get_option('custom_model_params', ''); ?>'
+        };
     </script>
 
     <?php
@@ -1394,11 +1385,12 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
     $message = sanitize_text_field($request->get_param('message'));
     $conversation_id = $request->get_param('conversation_id') ? intval($request->get_param('conversation_id')) : null;
     $user_id = get_current_user_id();
-    $interface_choice = deepseek_get_user_interface(); // 使用用户选择的接口
-    $enable_search = filter_var($request->get_param('enable_search'), FILTER_VALIDATE_BOOLEAN); // 获取前端开关状态
-    $file_ids = $request->get_param('file_ids') ? json_decode($request->get_param('file_ids'), true) : []; // 获取上传的文件信息
+    $interface_choice = $request->get_param('interface') ?: deepseek_get_user_interface();
+    $model_choice = sanitize_text_field($request->get_param('model')); // 用户选择的模型参数
+    $enable_search = filter_var($request->get_param('enable_search'), FILTER_VALIDATE_BOOLEAN);
+    $file_ids = $request->get_param('file_ids') ? json_decode($request->get_param('file_ids'), true) : [];
 
-    // 如果启用了关键词检测，进行关键词检查
+    // 关键词检测
     $enable_keyword_detection = get_option('enable_keyword_detection', '0');
     if ($enable_keyword_detection) {
         $keywords = get_option('keyword_list', '');
@@ -1413,19 +1405,58 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
         }
     }
 
-    // 当消息中包含“请帮我生成一张图片”的提示词时，走通义千问图像生成接口
-    $enable_image = get_option('qwen_enable_image');
-    $qwen_api_key = get_option('qwen_api_key');
-    $qwen_image_model = get_option('qwen_image_model');
-    if ($enable_image && $qwen_api_key && $qwen_image_model && strpos($message, '请帮我生成一张图片') !== false) {
+    // 获取模型参数列表并验证
+    $model_list = [];
+    switch ($interface_choice) {
+        case 'deepseek':
+            $model_list = explode(',', get_option('deepseek_model', 'deepseek-chat'));
+            break;
+        case 'doubao':
+            $model_list = explode(',', get_option('doubao_model', ''));
+            break;
+        case 'kimi':
+            $model_list = explode(',', get_option('kimi_model', ''));
+            break;
+        case 'openai':
+            $model_list = explode(',', get_option('openai_model', ''));
+            break;
+        case 'grok':
+            $model_list = explode(',', get_option('grok_model', ''));
+            break;
+        case 'qianfan':
+            $model_list = explode(',', get_option('qianfan_model', ''));
+            break;
+        case 'hunyuan':
+            $model_list = explode(',', get_option('hunyuan_model', ''));
+            break;
+        case 'qwen':
+            $model_list = array_merge(
+                explode(',', get_option('qwen_text_model', 'qwen-max')),
+                explode(',', get_option('qwen_image_model', 'wanx2.1-t2i-turbo'))
+            );
+            break;
+        case 'custom':
+            $model_list = explode(',', get_option('custom_model_params', ''));
+            break;
+        default:
+            return new WP_REST_Response(['success' => false, 'message' => '无效的接口选择'], 400);
+    }
+    $model_list = array_map('trim', $model_list);
+    $model = in_array($model_choice, $model_list) ? $model_choice : $model_list[0]; // 默认使用第一个参数
+
+    // 判断是否为通义千问图像模型
+    $qwen_image_models = explode(',', get_option('qwen_image_model', 'wanx2.1-t2i-turbo'));
+    $is_image_model = ($interface_choice === 'qwen' && in_array($model, $qwen_image_models));
+    if ($is_image_model && get_option('qwen_enable_image')) {
+        $api_key = get_option('qwen_api_key');
         $api_url = 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis';
         $headers = [
             'X-DashScope-Async: enable',
-            'Authorization: Bearer ' . $qwen_api_key,
+            'Authorization: Bearer ' . $api_key,
             'Content-Type: application/json'
         ];
         $body = [
-            'model' => $qwen_image_model,
+            'model' => $model,
             'input' => ['prompt' => $message],
             'parameters' => ['size' => '1024*1024', 'n' => 1]
         ];
@@ -1481,47 +1512,38 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
     switch ($interface_choice) {
         case 'deepseek':
             $api_key = get_option('deepseek_api_key');
-            $model = get_option('deepseek_model', 'deepseek-chat');
             $api_url = 'https://api.deepseek.com/chat/completions';
             break;
         case 'doubao':
             $api_key = get_option('doubao_api_key');
-            $model = get_option('doubao_model');
             $api_url = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
             break;
         case 'hunyuan':
             $api_key = get_option('hunyuan_api_key');
-            $model = get_option('hunyuan_model');
             $api_url = 'https://api.hunyuan.cloud.tencent.com/v1/chat/completions';
             break;
         case 'kimi':
             $api_key = get_option('kimi_api_key');
-            $model = get_option('kimi_model');
             $api_url = 'https://api.moonshot.cn/v1/chat/completions';
             break;
         case 'openai':
             $api_key = get_option('openai_api_key');
-            $model = get_option('openai_model');
             $api_url = 'https://api.openai.com/v1/chat/completions';
             break;
         case 'grok':
             $api_key = get_option('grok_api_key');
-            $model = get_option('grok_model');
             $api_url = 'https://api.x.ai/v1/chat/completions';
             break;
         case 'qianfan':
             $api_key = get_option('qianfan_api_key');
-            $model = get_option('qianfan_model');
             $api_url = 'https://qianfan.baidubce.com/v2/chat/completions';
             break;
         case 'qwen':
             $api_key = get_option('qwen_api_key');
-            $model = get_option('qwen_text_model', 'qwen-max');
             $api_url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
             break;
         case 'custom':
             $api_key = get_option('custom_api_key');
-            $model = get_option('custom_model_params');
             $api_url = get_option('custom_model_url');
             if (empty($api_key) || empty($model) || empty($api_url)) {
                 return new WP_REST_Response(['success' => false, 'message' => '自定义模型设置不完整'], 400);
@@ -1553,16 +1575,29 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
 
     // 处理文件内容
     if (!empty($file_ids)) {
+        $support_doc_models = [
+            'kimi' => explode(',', get_option('kimi_model', '')),
+            'openai' => explode(',', get_option('openai_model', '')),
+            'qwen' => ['qwen-long'] // 通义千问仅支持qwen-long
+        ];
+        $is_doc_supported = false;
+        if (isset($support_doc_models[$interface_choice])) {
+            $is_doc_supported = in_array($model, $support_doc_models[$interface_choice]);
+        }
+        if (!$is_doc_supported) {
+            return new WP_REST_Response([
+                'success' => false,
+                'message' => '该模型不支持分析文档'
+            ], 400);
+        }
+
         if ($interface_choice === 'qwen') {
-            // 通义千问使用fileid:// 格式
             $file_ids_str = '';
             foreach ($file_ids as $file_info) {
                 $file_id = $file_info['file_id'];
                 $interface = $file_info['interface'];
                 if ($interface === 'qwen') {
                     $file_ids_str .= ($file_ids_str ? ',' : '') . "fileid://$file_id";
-                } else {
-                    error_log("File interface mismatch: expected qwen, got $interface");
                 }
             }
             if ($file_ids_str) {
@@ -1576,7 +1611,6 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
                 'content' => "请分析这些文件并回答我的问题:\n\n问题: $message"
             ];
         } else {
-            // OpenAI和Kimi获取文件内容
             $file_content = '';
             foreach ($file_ids as $file_info) {
                 $file_id = $file_info['file_id'];
@@ -1594,13 +1628,12 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
                         $content_url = "https://api.moonshot.cn/v1/files/$file_id/content";
                         break;
                     default:
-                        error_log("Unsupported file interface for content fetch: $interface");
-                        break;
+                        // 不支持的接口直接跳过本次循环
+                        continue 2; // 明确跳出外层foreach循环
                 }
 
                 if (empty($content_api_key)) {
-                    error_log("API key not set for interface: $interface");
-                    continue;
+                    continue; // 如果API Key为空，跳过本次循环
                 }
 
                 $ch = curl_init();
@@ -1614,8 +1647,6 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
 
                 if ($http_code == 200) {
                     $file_content .= $response . "\n\n";
-                } else {
-                    error_log("Failed to fetch file content for file_id: $file_id, interface: $interface, HTTP code: $http_code, Response: $response");
                 }
             }
             $messages[] = [
@@ -1635,9 +1666,6 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
         'enable_search' => $interface_choice === 'qwen' && get_option('qwen_enable_search') && $enable_search
     ];
 
-    // 添加调试日志
-    error_log("Sending request to $api_url with data: " . json_encode($data));
-
     // 清空缓冲区，设置流式响应头
     if (ob_get_length()) { ob_end_clean(); }
     while (ob_get_level()) { ob_end_flush(); }
@@ -1654,14 +1682,16 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
     curl_setopt($ch, CURLOPT_URL, $api_url);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Content-Type: application/json',
-        'Authorization: Bearer ' . $api_key
+        'Authorization: Bearer ' . $api_key,
+        'Connection: close'
     ]);
     curl_setopt($ch, CURLOPT_POST, 1);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
+    curl_setopt($ch, CURLOPT_FRESH_CONNECT, true);
+    curl_setopt($ch, CURLOPT_FORBID_REUSE, true);
     curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($ch, $chunk) use (&$fullReply) {
         echo $chunk;
-        error_log("Received chunk: $chunk"); // 调试响应数据
         if (ob_get_level() > 0) {
             ob_flush();
         }
@@ -1676,7 +1706,6 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
 
     if ($curl_result === false || $http_code != 200) {
         $error_msg = "API request failed with HTTP code: $http_code";
-        error_log($error_msg);
         echo "data: " . json_encode(['error' => $error_msg]) . "\n\n";
         flush();
         exit();
@@ -2020,52 +2049,53 @@ function deepseek_call_ai_api($content, $interface_type = 'summary') {
         ? get_option('summary_interface_choice', 'deepseek') 
         : get_option('chat_interface_choice', 'deepseek');
 
+    // 获取模型参数并取第一个模型
     switch ($interface_choice) {
         case 'deepseek':
             $api_key = get_option('deepseek_api_key');
-            $model = get_option('deepseek_model');
+            $model_string = get_option('deepseek_model', 'deepseek-chat');
             $url = 'https://api.deepseek.com/chat/completions';
             break;
         case 'doubao':
             $api_key = get_option('doubao_api_key');
-            $model = get_option('doubao_model');
+            $model_string = get_option('doubao_model', '');
             $url = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
             break;
         case 'hunyuan':
             $api_key = get_option('hunyuan_api_key');
-            $model = get_option('hunyuan_model');
+            $model_string = get_option('hunyuan_model', '');
             $url = 'https://api.hunyuan.cloud.tencent.com/v1/chat/completions';
             break;            
         case 'qwen':
             $api_key = get_option('qwen_api_key');
-            $model = get_option('qwen_text_model');
+            $model_string = get_option('qwen_text_model', 'qwen-max');
             $url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
             break;
         case 'kimi':
             $api_key = get_option('kimi_api_key');
-            $model = get_option('kimi_model');
+            $model_string = get_option('kimi_model', '');
             $url = 'https://api.moonshot.cn/v1/chat/completions';
             break;       
         case 'openai':
             $api_key = get_option('openai_api_key');
-            $model = get_option('openai_model');
+            $model_string = get_option('openai_model', '');
             $url = 'https://api.openai.com/v1/chat/completions';
             break;
         case 'grok':
             $api_key = get_option('grok_api_key');
-            $model = get_option('grok_model');
+            $model_string = get_option('grok_model', '');
             $url = 'https://api.x.ai/v1/chat/completions';
             break;               
         case 'qianfan':
             $api_key = get_option('qianfan_api_key');
-            $model = get_option('qianfan_model');
+            $model_string = get_option('qianfan_model', '');
             $url = 'https://qianfan.baidubce.com/v2/chat/completions';
             break;                                       
         case 'custom':
             $api_key = get_option('custom_api_key');
-            $model = get_option('custom_model_params');
+            $model_string = get_option('custom_model_params', '');
             $url = get_option('custom_model_url');
-            if (empty($api_key) || empty($model) || empty($url)) {
+            if (empty($api_key) || empty($model_string) || empty($url)) {
                 error_log('自定义模型设置不完整');
                 return false;
             }
@@ -2075,9 +2105,15 @@ function deepseek_call_ai_api($content, $interface_type = 'summary') {
             return false;
     }
 
+    // 处理多模型参数，取第一个模型
+    $model_list = array_filter(array_map('trim', explode(',', $model_string)));
+    $model = !empty($model_list) ? $model_list[0] : ''; // 如果有多个模型，取第一个；否则为空
+
     // 检查必要参数
     if (empty($api_key) || empty($model) || empty($url)) {
-        error_log('AI接口配置缺失');
+        error_log('AI接口配置缺失 - API Key: ' . ($api_key ? '已设置' : '未设置') . 
+                  ', Model: ' . ($model ? $model : '未设置') . 
+                  ', URL: ' . ($url ? $url : '未设置'));
         return false;
     }
 
@@ -2134,10 +2170,7 @@ function deepseek_display_ai_summary($content) {
     $summary = get_post_meta($post_id, '_ai_summary', true);
 
     if ($summary) {
-        //$interface_choice = get_option('chat_interface_choice', 'deepseek');
-        //$title = '来自' . ($interface_choice === 'doubao' ? '豆包' : ($interface_choice === 'qwen' ? '通义千问' : 'DeepSeek')) . '的总结';
         $title = '来自AI助手的总结';
-
         $summary_html = '
             <div class="ai-summary-container">
                 <div class="ai-summary-title">' . esc_html($title) . '</div>
@@ -2157,7 +2190,7 @@ function deepseek_output_inline_styles() {
         return;
     }
 
-    // 获取当前文章 ID
+    // 获取当前文章ID
     $post_id = get_the_ID();
 
     // 检查文章是否有AI总结
@@ -2407,24 +2440,35 @@ function deepseek_generate_article_stream_ajax() {
     }
 
     $api_key = get_option($interface_choice . '_api_key');
-    $model = ($interface_choice === 'custom') ? get_option('custom_model_params') : get_option($interface_choice . '_model');
+    $model_string = ($interface_choice === 'custom') ? get_option('custom_model_params') : 
+                    ($interface_choice === 'qwen' ? get_option('qwen_text_model') : get_option($interface_choice . '_model'));
 
     if ($interface_choice === 'deepseek') {
         $url = 'https://api.deepseek.com/chat/completions';
+        $default_model = 'deepseek-chat';
     } elseif ($interface_choice === 'doubao') {
         $url = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
+        $default_model = '';
     } elseif ($interface_choice === 'qwen') {
         $url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+        $default_model = 'qwen-max';
     } elseif ($interface_choice === 'custom') {
         $url = get_option('custom_model_url');
+        $default_model = '';
     } else {
         echo "data: " . json_encode(['error' => '不支持的接口']) . "\n\n";
         flush();
         exit;
     }
 
+    // 处理多模型参数，取第一个模型
+    $model_list = array_filter(array_map('trim', explode(',', $model_string)));
+    $model = !empty($model_list) ? $model_list[0] : $default_model;
+
     if (empty($api_key) || empty($model) || empty($url)) {
-        echo "data: " . json_encode(['error' => '接口配置缺失']) . "\n\n";
+        echo "data: " . json_encode(['error' => '接口配置缺失 - API Key: ' . ($api_key ? '已设置' : '未设置') . 
+                                     ', Model: ' . ($model ? $model : '未设置') . 
+                                     ', URL: ' . ($url ? $url : '未设置')]) . "\n\n";
         flush();
         exit;
     }
@@ -2487,7 +2531,6 @@ function deepseek_generate_article_stream_ajax() {
 }
 add_action('wp_ajax_generate_article_stream_ajax', 'deepseek_generate_article_stream_ajax');
 add_action('wp_ajax_nopriv_generate_article_stream_ajax', 'deepseek_generate_article_stream_ajax');
-
 
 // 发布文章的AJAX处理函数
 function deepseek_publish_article_ajax() {
