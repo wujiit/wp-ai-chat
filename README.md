@@ -3,7 +3,7 @@
 # 小半WordPress ai助手  
 
 [![License](https://img.shields.io/badge/license-GPL-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.9.1-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/3.9.1)
+[![Version](https://img.shields.io/badge/version-3.9.5-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/3.9.5)
 [![WordPress](https://img.shields.io/badge/WordPress-6.7-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.0-orange.svg)](https://www.php.net/)
 [![Nginx](https://img.shields.io/badge/Nginx-1.2-green.svg)](https://nginx.org/)
@@ -34,7 +34,7 @@
 1. 支持字节扣子智能体应用对接  
 1. 支持文多多AIPPT接口生成PPT文件  
 1. 支持通义千问的图片生成模型  
-1. 支持通义千问联网搜索(仅部分模型支持)  
+1. 支持通义千问联网搜索
 1. 模型参数是自定义填写  
 1. 系统会用一个单独的数据表保存对话记录的第一句  
 1. 用户可以删掉自己的历史对话记录  
@@ -44,7 +44,7 @@
 1. 可以通过AI接口对文章进行总结  
 1. 前台显示AI助手入口  
 1. 只允许登录用户使用  
-1. 支持Markdown格式(需要AI返回的是Markdown格式)  
+1. 支持Markdown格式
 1. DeepSeek余额信息  
 1. 通过AI接口对文章进行翻译  
 1. 支持对接腾讯云、百度云 TTS服务实现语音播放文章内容  
@@ -57,8 +57,9 @@
 1. 智能体应用开场问题  
 1. 自定义前台ai助手名称等  
 1. 自定义未登录提示文字  
-1. 前台用户切换接口  
+1. 支持前台用户选择接口  
 1. 支持kimi和通义千问qwen-long上传文件分析文档内容  
+1. 支持前台用户选择模型参数  
 
 
 ## 📥 安装
@@ -102,6 +103,6 @@ ppt调用js文件： docmee-ui-sdk-iframe.min.js
 Markdown解析文件： marked.min.js 
 
 
-![23a9559aee78336d28d20eb65fd7a860.jpeg](https://i.miji.bid/2025/02/27/23a9559aee78336d28d20eb65fd7a860.jpeg)
+![2fa114d7cc7d22ae16005bb39925a2df.jpeg](https://i.miji.bid/2025/03/02/2fa114d7cc7d22ae16005bb39925a2df.jpeg)
 ![be8d09585a3c7da555d8edd2997d46bf.jpeg](https://i.miji.bid/2025/02/24/be8d09585a3c7da555d8edd2997d46bf.jpeg)
 ![a979fdb418172e3cbb8241d211e5fff5.jpeg](https://i.miji.bid/2025/02/17/a979fdb418172e3cbb8241d211e5fff5.jpeg)
