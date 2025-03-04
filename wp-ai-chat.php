@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 3.9.6
+Version: 3.9.7
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -2359,7 +2359,7 @@ function deepseek_render_article_generator_page() {
     <div class="wrap">
         <h1>文章生成</h1>
         <form method="post" action="" id="article-form">
-            <p><strong>提示词：</strong></p>
+            <p><strong>关键词(比如: 人工智能)：</strong></p>
             <input type="text" name="keyword" style="width: 500px;" />
 
             <p><strong>选择文章分类：</strong></p>
@@ -2388,10 +2388,13 @@ function deepseek_render_article_generator_page() {
                 <option value="custom" <?php selected($interface_choice, 'custom'); ?>>自定义模型</option>
             </select>
 
+            <p><strong>启用联网搜索（仅限通义千问qwen-max、qwen-plus、qwen-turbo模型）：</strong></p>
+            <input type="checkbox" name="enable_search" id="enable_search" value="1" />
+
             <p><input type="button" value="生成文章" class="button-primary" id="generate-button" /></p>
 
             <div id="generation-status" style="display: none; color: #666;">正在生成中...</div>
-            <div id="timeout-status" style="display: none; color: red;">超时，请更换模型或者接口再重试，模型需要支持长文本。</div>
+            <div id="timeout-status" style="display: none; color: red;"></div> <!-- 显示错误信息 -->
 
             <p><strong>文章标题：</strong></p>
             <input type="text" name="post_title" id="post_title" value="" style="width: 50%;"/>
@@ -2403,26 +2406,24 @@ function deepseek_render_article_generator_page() {
 
             <p><input type="submit" name="publish_article" value="发布文章" class="button-primary" id="publish-button" /></p>
 
-            <!-- 显示发布结果的区域 -->
             <div id="publish-result" style="display: none; margin-top: 10px;"></div>
         </form>
         生成的标题和内容还是需要自己再修改下，只适合纯文本内容的文章生成。
     </div>
 
     <script>
-    // 监听生成文章按钮点击事件，使用SSE流式获取文章内容
     document.getElementById('generate-button').addEventListener('click', function() {
-        // 显示“正在生成中”提示
         document.getElementById('generation-status').style.display = 'block';
         document.getElementById('timeout-status').style.display = 'none';
 
         var keyword = document.querySelector('input[name="keyword"]').value;
         var interface_choice = document.querySelector('select[name="interface_choice"]').value;
+        var enable_search = document.querySelector('input[name="enable_search"]').checked ? 1 : 0;
 
-        // 构造SSE请求URL
         var sseUrl = ajaxurl + '?action=generate_article_stream_ajax'
             + '&keyword=' + encodeURIComponent(keyword)
-            + '&interface_choice=' + encodeURIComponent(interface_choice);
+            + '&interface_choice=' + encodeURIComponent(interface_choice)
+            + '&enable_search=' + encodeURIComponent(enable_search);
 
         if (typeof(EventSource) !== "undefined") {
             var eventSource = new EventSource(sseUrl);
@@ -2430,9 +2431,14 @@ function deepseek_render_article_generator_page() {
             eventSource.onmessage = function(event) {
                 try {
                     var data = JSON.parse(event.data);
-                    if (data.content) {
+                    if (data.error) {
+                        // 如果后端返回错误，显示在timeout-status中
+                        document.getElementById('timeout-status').innerText = data.error;
+                        document.getElementById('timeout-status').style.display = 'block';
+                        document.getElementById('generation-status').style.display = 'none';
+                        eventSource.close();
+                    } else if (data.content) {
                         articleContent += data.content;
-                        // 将实时返回的内容更新到编辑器中
                         var contentWithBr = articleContent.replace(/\n/g, '<br>');
                         if (tinymce.get('post_content')) {
                             tinymce.get('post_content').setContent(contentWithBr);
@@ -2442,10 +2448,13 @@ function deepseek_render_article_generator_page() {
                     }
                 } catch (e) {
                     console.error("解析SSE数据错误", e);
+                    document.getElementById('timeout-status').innerText = '数据解析错误，请重试。';
+                    document.getElementById('timeout-status').style.display = 'block';
+                    document.getElementById('generation-status').style.display = 'none';
+                    eventSource.close();
                 }
             };
             eventSource.addEventListener('done', function(event) {
-                // 流结束后，从返回内容中提取标题
                 var lines = articleContent.split("\n");
                 if (lines.length > 0) {
                     document.getElementById('post_title').value = lines[0];
@@ -2455,20 +2464,21 @@ function deepseek_render_article_generator_page() {
             });
             eventSource.onerror = function(event) {
                 console.error("SSE 连接错误", event);
+                document.getElementById('timeout-status').innerText = '连接错误，请检查网络或接口配置。';
                 document.getElementById('timeout-status').style.display = 'block';
                 document.getElementById('generation-status').style.display = 'none';
                 eventSource.close();
             };
         } else {
             document.getElementById('generation-status').style.display = 'none';
-            alert("您的浏览器不支持服务器发送事件 (SSE)，请使用支持SSE的浏览器。");
+            document.getElementById('timeout-status').innerText = '您的浏览器不支持服务器发送事件 (SSE)，请更换浏览器。';
+            document.getElementById('timeout-status').style.display = 'block';
         }
     });
 
-    // 发布文章按钮
+    // 发布文章
     document.getElementById('publish-button').addEventListener('click', function(e) {
-        e.preventDefault();  // 防止表单默认提交
-
+        e.preventDefault();
         var post_title = document.getElementById('post_title').value;
         var post_content = tinymce.get('post_content').getContent();
         var category_id = document.querySelector('select[name="category_id"]').value;
@@ -2517,6 +2527,7 @@ function deepseek_generate_article_stream_ajax() {
 
     $keyword = isset($_GET['keyword']) ? sanitize_text_field($_GET['keyword']) : '';
     $interface_choice = isset($_GET['interface_choice']) ? sanitize_text_field($_GET['interface_choice']) : '';
+    $enable_search = isset($_GET['enable_search']) ? intval($_GET['enable_search']) : 0;
 
     if (empty($keyword) || empty($interface_choice)) {
         echo "data: " . json_encode(['error' => '缺少必要参数']) . "\n\n";
@@ -2558,14 +2569,34 @@ function deepseek_generate_article_stream_ajax() {
         exit;
     }
 
-    $payload = json_encode([
+    // 检查联网搜索条件
+    $supported_qwen_models = ['qwen-max', 'qwen-plus', 'qwen-turbo'];
+    $is_qwen_search_supported = ($interface_choice === 'qwen' && in_array($model, $supported_qwen_models));
+    
+    if ($enable_search && !$is_qwen_search_supported) {
+        echo "data: " . json_encode(['error' => '联网搜索仅支持通义千问的qwen-max、qwen-plus、qwen-turbo 模型']) . "\n\n";
+        flush();
+        exit;
+    }
+
+    // 根据是否启用联网搜索设置提示词
+    $prompt = $enable_search && $is_qwen_search_supported
+        ? "请根据关键词 '{$keyword}' 进行实时全网联网搜索，获取今天最新的资料、数据或资讯报道。确保搜索结果是最新的，并且基于这些最新信息撰写一篇相关文章。文章标题应简洁明了，直接反映文章的核心内容。文章内容应结构清晰，逻辑严谨，包含必要的背景信息、最新动态、数据分析或专家观点等。确保文章内容准确、权威，并注明信息来源。文章行首不要带*号或多个#号，也不要带Markdown格式符号。请务必在撰写文章前完成实时联网搜索，以确保内容基于最新资料。"
+        : "根据关键词 '{$keyword}' 写一篇文章，包括标题和内容。要求：1. 标题简洁且与关键词相关；2. 内容逻辑清晰，围绕关键词展开，语言流畅；3. 行首不要使用Markdown符号，也不要带特殊符号；4. 文章结构完整，段落分明。";
+
+    $payload = [
         'model' => $model,
         'messages' => [
             ['role' => 'system', 'content' => 'You are a helpful assistant.'],
-            ['role' => 'user', 'content' => '根据关键词 "' . $keyword . '" 生成文章和标题，文章行首不要带*号或者多个#号，也不要带Markdown格式符号']
+            ['role' => 'user', 'content' => $prompt]
         ],
         'stream' => true,
-    ]);
+    ];
+
+    // 如果是通义千问且启用联网搜索，添加enable_search参数
+    if ($is_qwen_search_supported && $enable_search) {
+        $payload['enable_search'] = true;
+    }
 
     $headers = [
         'Authorization: Bearer ' . $api_key,
@@ -2575,7 +2606,7 @@ function deepseek_generate_article_stream_ajax() {
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($ch, CURLOPT_TIMEOUT, 120);
 
