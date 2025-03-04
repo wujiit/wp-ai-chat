@@ -365,7 +365,7 @@ function updateUploadedFilesList() {
     });
 }
 
-// 处理发送消息
+// 处理发送消息接口
 function handleSendMessage() {
     var message = document.getElementById('deepseek-chat-input').value.trim();
     if (!message && uploadedFiles.length === 0) return;
@@ -399,9 +399,15 @@ function handleSendMessage() {
     }
 }
 
+// 截断字符
+function truncateText(text, maxLength) {
+    if (!text) return '';
+    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+}
+
 // 发送消息
 function sendMessage(message, currentInterface, currentModel) {
-    var newConversation = !currentConversationId;
+var newConversation = !currentConversationId;
     var currentMessage = message;
 
     var messagesContainer = document.getElementById('deepseek-chat-messages');
@@ -414,6 +420,7 @@ function sendMessage(message, currentInterface, currentModel) {
     var enableSearchSwitch = document.getElementById('enable-search');
     var enableSearch = enableSearchSwitch ? enableSearchSwitch.checked : false;
 
+    // 立即显示用户消息
     if (message || uploadedFiles.length > 0) {
         var userMessageContainer = document.createElement('div');
         userMessageContainer.classList.add('message-bubble', 'user');
@@ -431,6 +438,7 @@ function sendMessage(message, currentInterface, currentModel) {
             userMessageContainer.appendChild(fileList);
         }
         thinkingMessage.insertAdjacentElement('beforebegin', userMessageContainer);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight; // 确保滚动到底部
     }
 
     fetch(restUrl, {
@@ -463,13 +471,68 @@ function sendMessage(message, currentInterface, currentModel) {
                 thinkingMessage.innerHTML = data.message || '请求失败';
                 return;
             }
-            if (data.success && data.is_image) {
+            // 处理Pollinations文生图
+            if (data.success && data.is_pollinations_image) {
+                thinkingMessage.remove();
+                var botMessageContainer = document.createElement('div');
+                botMessageContainer.classList.add('message-bubble', 'bot');
+                var img = document.createElement('img');
+                img.src = data.image_url;
+                img.alt = data.conversation_title || 'Generated Image';
+                img.style.maxWidth = '100%';
+                botMessageContainer.appendChild(img);
+
+                var promptText = document.createElement('p');
+                promptText.textContent = '生成提示词: ' + data.conversation_title;
+                botMessageContainer.appendChild(promptText);
+
+                messagesContainer.appendChild(botMessageContainer);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                document.getElementById('deepseek-chat-input').value = '';
+
+                // 确保新对话时历史记录立即更新
+                if (!currentConversationId) {
+                    var historyContainer = document.querySelector('#deepseek-chat-history ul');
+                    var newChatItem = document.createElement('li');
+                    newChatItem.setAttribute('data-conversation-id', data.conversation_id);
+                    newChatItem.innerHTML = '<span class="deepseek-chat-title">' + truncateText(data.conversation_title, 6) + '</span>' +
+                        '<button class="deepseek-delete-log" data-conversation-id="' + data.conversation_id + '">删除</button>';
+                    historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
+
+                    newChatItem.addEventListener('click', function() {
+                        loadChatLog(data.conversation_id);
+                    });
+
+                    newChatItem.querySelector('.deepseek-delete-log').addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        var conversationId = this.getAttribute('data-conversation-id');
+                        fetch(adminAjaxUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                            },
+                            body: 'action=deepseek_delete_log&conversation_id=' + conversationId
+                        }).then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                this.parentElement.remove();
+                                document.getElementById('deepseek-chat-messages').innerHTML = '';
+                                setCurrentConversationId(null);
+                            }
+                        });
+                    });
+
+                    setCurrentConversationId(data.conversation_id);
+                }
+            }
+            // 处理通义千问文生图
+            else if (data.success && data.is_image) {
                 handleImageGeneration(data.task_id);
                 if (!currentConversationId) {
                     var historyContainer = document.querySelector('#deepseek-chat-history ul');
                     var newChatItem = document.createElement('li');
                     newChatItem.setAttribute('data-conversation-id', data.conversation_id);
-                    newChatItem.innerHTML = '<span class="deepseek-chat-title">' + data.conversation_title + '</span>' +
+                    newChatItem.innerHTML = '<span class="deepseek-chat-title">' + truncateText(data.conversation_title, 6) + '</span>' +
                         '<button class="deepseek-delete-log" data-conversation-id="' + data.conversation_id + '">删除</button>';
                     historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
 
@@ -534,7 +597,7 @@ function sendMessage(message, currentInterface, currentModel) {
                         addVoicePlayback(botMessageContainer, contentReply);
                         messagesContainer.scrollTop = messagesContainer.scrollHeight;
                         document.getElementById('deepseek-chat-input').value = '';
-                        //uploadedFiles = []; // 清空已上传文件
+                        // uploadedFiles = []; // 清空已上传文件
                         updateUploadedFilesList();
                         return;
                     }
@@ -553,7 +616,7 @@ function sendMessage(message, currentInterface, currentModel) {
                                         var historyContainer = document.querySelector('#deepseek-chat-history ul');
                                         var newChatItem = document.createElement('li');
                                         newChatItem.setAttribute('data-conversation-id', jsonData.conversation_id);
-                                        newChatItem.innerHTML = '<span class="deepseek-chat-title">' + currentMessage + '</span>' +
+                                        newChatItem.innerHTML = '<span class="deepseek-chat-title">' + truncateText(currentMessage, 6) + '</span>' +
                                             '<button class="deepseek-delete-log" data-conversation-id="' + jsonData.conversation_id + '">删除</button>';
                                         historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
 
@@ -613,6 +676,7 @@ function sendMessage(message, currentInterface, currentModel) {
         if (errorMsg) errorMsg.innerHTML = '网络错误，请稍后重试';
     });
 }
+
 
 // 处理图像生成
 function handleImageGeneration(taskId) {

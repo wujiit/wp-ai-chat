@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 3.9.5
+Version: 3.9.6
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -213,6 +213,9 @@ function deepseek_register_settings() {
     register_setting('deepseek_chat_options_group', 'custom_model_params', array('sanitize_callback' => 'sanitize_text_field')); // 自定义模型参数
     register_setting('deepseek_chat_options_group', 'custom_model_url');       // 自定义模型请求 URL
 
+    // Pollinations模型参数设置
+    register_setting('deepseek_chat_options_group', 'pollinations_model', array('sanitize_callback' => 'sanitize_text_field'));
+
     register_setting('deepseek_chat_options_group', 'show_ai_helper'); // ai助手显示
     register_setting('deepseek_chat_options_group', 'enable_ai_summary'); // 文章总结
     register_setting('deepseek_chat_options_group', 'enable_ai_voice_reading'); // AI对话语音朗读
@@ -293,6 +296,9 @@ function deepseek_register_settings() {
     add_settings_field('custom_model_params', '自定义模型参数', 'custom_model_params_callback', 'deepseek-chat', 'deepseek_main_section');
     add_settings_field('custom_model_url', '自定义模型请求 URL', 'custom_model_url_callback', 'deepseek-chat', 'deepseek_main_section');
 
+    // Pollinations模型参数字段
+    add_settings_field('pollinations_model', 'Pollinations 模型参数', 'pollinations_model_callback', 'deepseek-chat', 'deepseek_main_section');
+
     // 自定义提示词
     add_settings_field('deepseek_custom_prompts', '自定义提示词', 'deepseek_custom_prompts_callback', 'deepseek-chat', 'deepseek_main_section');
 
@@ -357,6 +363,7 @@ function deepseek_register_settings() {
 }
 add_action('admin_init', 'deepseek_register_settings');
 
+
 // 文件上传相关回调函数
 function enable_file_upload_callback() {
     $enabled = get_option('enable_file_upload', '0');
@@ -411,6 +418,7 @@ function chat_interfaces_callback() {
         'doubao' => '豆包AI',
         'qianfan' => '千帆(文心一言)',
         'hunyuan' => '腾讯混元',
+        'pollinations' => 'Pollinations (文生图)',
         'custom' => '自定义接口'
     );
     ?>
@@ -438,6 +446,7 @@ function default_chat_interface_callback() {
         'doubao' => '豆包AI',
         'qianfan' => '千帆(文心一言)',
         'hunyuan' => '腾讯混元',
+        'pollinations' => 'Pollinations (文生图)',
         'custom' => '自定义接口'
     );
     ?>
@@ -675,6 +684,13 @@ function get_deepseek_chat_page() {
 add_action('wp_ajax_get_deepseek_chat_page', 'get_deepseek_chat_page');
 add_action('wp_ajax_nopriv_get_deepseek_chat_page', 'get_deepseek_chat_page');
 
+// Pollinations模型参数回调函数
+function pollinations_model_callback() {
+    $model = get_option('pollinations_model', 'flux'); // 默认模型为flux
+    echo '<input type="text" name="pollinations_model" value="' . esc_attr($model) . '" style="width: 500px;" />';
+    echo '<p class="description">可用模型参考: <a href="https://image.pollinations.ai/models" target="_blank">Pollinations Models</a>，默认: flux，使用Pollinations最好是海外服务器，内地服务器请注意请求时间。</p>';
+}
+
 // 通义千问相关回调
 function qwen_api_key_callback() {
     $api_key = get_option('qwen_api_key');
@@ -798,6 +814,34 @@ function deepseek_model_callback() {
     $model = get_option('deepseek_model', 'deepseek-chat'); // 默认模型为deepseek-chat
     echo '<input type="text" name="deepseek_model" value="' . esc_attr($model) . '" style="width: 500px;" />';
     echo '<p class="description" style="color: red;">多个参数用英文逗号分隔，第一个为默认参数，例如：deepseek-chat,deepseek-coder</p>';    
+}
+
+// 获取DeepSeek余额信息
+function get_deepseek_balance() {
+    $api_key = get_option('deepseek_api_key');
+    if (empty($api_key)) {
+        return false;
+    }
+
+    $response = wp_remote_get('https://api.deepseek.com/user/balance', array(
+        'headers' => array(
+            'Accept' => 'application/json',
+            'Authorization' => 'Bearer ' . $api_key,
+        ),
+    ));
+
+    if (is_wp_error($response)) {
+        return false;
+    }
+
+    $body = wp_remote_retrieve_body($response);
+    $data = json_decode($body, true);
+
+    if (isset($data['balance_infos'][0]['total_balance'])) {
+        return $data['balance_infos'][0]['total_balance'];
+    }
+
+    return false;
 }
 
 // 设置页面
@@ -932,33 +976,6 @@ function deepseek_render_settings_page() {
     <?php
 }
 
-// 获取DeepSeek余额信息
-function get_deepseek_balance() {
-    $api_key = get_option('deepseek_api_key');
-    if (empty($api_key)) {
-        return false;
-    }
-
-    $response = wp_remote_get('https://api.deepseek.com/user/balance', array(
-        'headers' => array(
-            'Accept' => 'application/json',
-            'Authorization' => 'Bearer ' . $api_key,
-        ),
-    ));
-
-    if (is_wp_error($response)) {
-        return false;
-    }
-
-    $body = wp_remote_retrieve_body($response);
-    $data = json_decode($body, true);
-
-    if (isset($data['balance_infos'][0]['total_balance'])) {
-        return $data['balance_infos'][0]['total_balance'];
-    }
-
-    return false;
-}
 
 // 加载前台CSS文件
 function deepseek_enqueue_assets() {
@@ -1278,6 +1295,7 @@ function deepseek_chat_shortcode() {
                                     'doubao' => '豆包AI',
                                     'qianfan' => '文心一言',
                                     'hunyuan' => '腾讯混元',
+                                    'pollinations' => '英文生图',
                                     'custom' => '备份接口'
                                 );
                                 foreach ($enabled_interfaces as $interface) {
@@ -1368,6 +1386,7 @@ function deepseek_chat_shortcode() {
             'qianfan': '<?php echo get_option('qianfan_model', ''); ?>',
             'hunyuan': '<?php echo get_option('hunyuan_model', ''); ?>',
             'qwen': '<?php echo get_option('qwen_text_model', 'qwen-max') . ',' . get_option('qwen_image_model', 'wanx2.1-t2i-turbo'); ?>',
+            'pollinations': '<?php echo get_option('pollinations_model', 'flux'); ?>',
             'custom': '<?php echo get_option('custom_model_params', ''); ?>'
         };
     </script>
@@ -1429,6 +1448,9 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
         case 'hunyuan':
             $model_list = explode(',', get_option('hunyuan_model', ''));
             break;
+        case 'pollinations':
+            $model_list = explode(',', get_option('pollinations_model', 'flux'));
+            break;    
         case 'qwen':
             $model_list = array_merge(
                 explode(',', get_option('qwen_text_model', 'qwen-max')),
@@ -1443,6 +1465,76 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
     }
     $model_list = array_map('trim', $model_list);
     $model = in_array($model_choice, $model_list) ? $model_choice : $model_list[0]; // 默认使用第一个参数
+
+    // 判断是否为Pollinations文生图请求
+    if ($interface_choice === 'pollinations') {
+    $encoded_prompt = urlencode($message);
+    $api_url = "https://image.pollinations.ai/prompt/{$encoded_prompt}?model={$model}&width=1024&height=1024&nologo=true&private=true";
+
+    $max_retries = 3;
+    $retry_delay = 2; //秒
+    $attempt = 0;
+    $image_url = null;
+
+    do {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $api_url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 120); // 增加超时时间
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // 跟随重定向
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Accept: image/*', // 明确要求图片响应
+            'User-Agent: Mozilla/5.0'
+        ]);
+
+        $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($http_code == 200 && $response !== false) {
+            // Pollinations返回的是图片二进制数据，直接使用URL
+            $image_url = $api_url;
+            break;
+        } else {
+            $attempt++;
+            if ($attempt < $max_retries) {
+                sleep($retry_delay); // 等待后重试
+            }
+        }
+    } while ($attempt < $max_retries && !$image_url);
+
+    if ($image_url) {
+        // 保存到数据库
+        $wpdb->insert($table_name, [
+            'user_id' => $user_id,
+            'conversation_id' => $conversation_id ?: 0,
+            'conversation_title' => $message,
+            'message' => $message,
+            'response' => json_encode(['image_url' => $image_url])
+        ]);
+
+        if (!$conversation_id) {
+            $conversation_id = $wpdb->insert_id;
+            $wpdb->update($table_name, ['conversation_id' => $conversation_id], ['id' => $conversation_id]);
+        }
+
+        return new WP_REST_Response([
+            'success' => true,
+            'is_pollinations_image' => true,
+            'image_url' => $image_url,
+            'conversation_id' => $conversation_id,
+            'conversation_title' => $message,
+        ], 200);
+    } else {
+        return new WP_REST_Response([
+            'success' => false,
+            'message' => 'Pollinations 图片生成失败: ' . ($error ?: '多次尝试后仍无响应'),
+            'attempts' => $attempt
+        ], 500);
+    }
+}
 
     // 判断是否为通义千问图像模型
     $qwen_image_models = explode(',', get_option('qwen_image_model', 'wanx2.1-t2i-turbo'));
@@ -1840,7 +1932,6 @@ function deepseek_load_log() {
     $conversation_id = intval($_GET['conversation_id']);
     $user_id = get_current_user_id();
 
-    // 从数据库中查询指定用户和对话ID的记录
     $logs = $wpdb->get_results($wpdb->prepare(
         "SELECT * FROM $table_name 
         WHERE conversation_id = %d 
@@ -1850,36 +1941,31 @@ function deepseek_load_log() {
         $user_id
     ));
 
-    // 如果没有找到记录，返回错误信息
     if (empty($logs)) {
         wp_send_json(array('success' => false, 'message' => '未找到对话记录。'));
         return;
     }
 
-    // 处理每条记录
     $processed = array();
     foreach ($logs as $log) {
-        // 解析response字段（JSON格式）
         $response = json_decode($log->response, true);
         
-        // 处理图片生成消息
         if ($response && isset($response['image_url'])) {
-            $html = '<div class="image-prompt">' . esc_html($response['actual_prompt']) . '</div>';
+            // 使用 message 作为默认提示词，如果 actual_prompt 不存在
+            $actual_prompt = isset($response['actual_prompt']) ? esc_html($response['actual_prompt']) : esc_html($log->message);
+            $html = '<div class="image-prompt">' . $actual_prompt . '</div>';
             $html .= '<img src="' . esc_url($response['image_url']) . '" style="max-width:100%;height:auto;" />';
             $processed[] = array(
                 'message'  => esc_html($log->message),
-                'response' => $html // 图片消息仍返回HTML
+                'response' => $html
             );
         } else {
-            // 处理文本消息，仅返回纯文本内容
             $content = '';
             $reasoning_content = '';
             if (is_array($response)) {
-                // 如果response是数组，提取content和reasoning_content
                 $content = isset($response['content']) ? $response['content'] : '';
                 $reasoning_content = isset($response['reasoning_content']) ? $response['reasoning_content'] : '';
             } else {
-                // 如果response是字符串，直接使用
                 $content = $log->response;
             }
 
@@ -1893,7 +1979,6 @@ function deepseek_load_log() {
         }
     }
 
-    // 返回成功响应和处理后的消息数组
     wp_send_json([
         'success'  => true, 
         'messages' => $processed
