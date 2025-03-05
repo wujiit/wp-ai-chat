@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 3.9.8
+Version: 3.9.9
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -72,7 +72,7 @@ function deepseek_add_settings_link($links) {
 add_filter('plugin_action_links_' . plugin_basename(__FILE__), 'deepseek_add_settings_link');
 
 // 注册激活钩子，确保插件启用时会调用子文件中的函数
-register_activation_hook(__FILE__, 'docmee_create_ppt_page');
+register_activation_hook(__FILE__, 'deepseek_create_ppt_page');
 
 // 创建对话页面
 function deepseek_create_chat_page() {
@@ -205,6 +205,14 @@ function deepseek_register_settings() {
     register_setting('deepseek_chat_options_group', 'xunfei_api_key'); // 讯飞星火 API Key
     register_setting('deepseek_chat_options_group', 'xunfei_model', array('sanitize_callback' => 'sanitize_text_field')); // 讯飞星火模型参数   
 
+    // Gemini
+    register_setting('deepseek_chat_options_group', 'gemini_api_key');
+    register_setting('deepseek_chat_options_group', 'gemini_model', array('sanitize_callback' => 'sanitize_text_field'));
+
+    // Claude
+    register_setting('deepseek_chat_options_group', 'claude_api_key');
+    register_setting('deepseek_chat_options_group', 'claude_model', array('sanitize_callback' => 'sanitize_text_field'));
+
     // 通义千问文本和图像
     register_setting('deepseek_chat_options_group', 'qwen_api_key'); // 通义千问 API Key
     register_setting('deepseek_chat_options_group', 'qwen_text_model', array('sanitize_callback' => 'sanitize_text_field')); // 通义千问 文本模型
@@ -255,6 +263,11 @@ function deepseek_register_settings() {
     register_setting('deepseek_chat_options_group', 'allowed_file_types', array('default' => 'txt,docx,pdf,xlsx,md','sanitize_callback' => 'sanitize_text_field'));
     register_setting('deepseek_chat_options_group', 'max_file_size', array('default' => '10','sanitize_callback' => 'sanitize_text_field'));
 
+    // 会员设置
+    register_setting('deepseek_chat_options_group', 'deepseek_vip_check_enabled', 'intval');
+    register_setting('deepseek_chat_options_group', 'deepseek_vip_prompt_page');
+    register_setting('deepseek_chat_options_group', 'deepseek_vip_keyword');
+
     add_settings_section('deepseek_main_section', '基础设置', null, 'deepseek-chat');
 
     // 接口选择和默认接口设置
@@ -280,6 +293,14 @@ function deepseek_register_settings() {
     // Grok AI配置项
     add_settings_field('grok_api_key', 'Grok API Key', 'grok_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
     add_settings_field('grok_model', 'Grok 模型参数', 'grok_model_callback', 'deepseek-chat', 'deepseek_main_section');
+
+    // Gemini配置项
+    add_settings_field('gemini_api_key', 'Gemini API Key', 'gemini_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
+    add_settings_field('gemini_model', 'Gemini 模型参数', 'gemini_model_callback', 'deepseek-chat', 'deepseek_main_section');
+
+    // Claude配置项
+    add_settings_field('claude_api_key', 'Claude API Key', 'claude_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
+    add_settings_field('claude_model', 'Claude 模型参数', 'claude_model_callback', 'deepseek-chat', 'deepseek_main_section');
 
     // 千帆 AI配置项
     add_settings_field('qianfan_api_key', '千帆 API Key(文心一言)', 'qianfan_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
@@ -367,12 +388,34 @@ function deepseek_register_settings() {
     add_settings_field('allowed_file_types', '允许的文件格式', 'allowed_file_types_callback', 'deepseek-chat', 'deepseek_main_section');
     add_settings_field('max_file_size', '最大文件大小(MB)', 'max_file_size_callback', 'deepseek-chat', 'deepseek_main_section');
 
+    // 会员验证相关字段
+    add_settings_field('deepseek_vip_check_enabled', '启用网站会员验证', 'deepseek_vip_check_enabled_callback', 'deepseek-chat', 'deepseek_main_section');
+    add_settings_field('deepseek_vip_keyword', '会员验证关键词', 'deepseek_vip_keyword_callback', 'deepseek-chat', 'deepseek_main_section');
+    add_settings_field('deepseek_vip_prompt_page', '开通会员页面链接', 'deepseek_vip_prompt_page_callback', 'deepseek-chat', 'deepseek_main_section');
+
     // AJAX处理文件上传
     add_action('wp_ajax_deepseek_upload_file', 'deepseek_handle_file_upload');    
     
 }
 add_action('admin_init', 'deepseek_register_settings');
 
+
+// 启用网站会员验证回调函数
+function deepseek_vip_check_enabled_callback() {
+    $enabled = get_option('deepseek_vip_check_enabled', '0');
+    echo '<input type="checkbox" name="deepseek_vip_check_enabled" value="1" ' . checked(1, $enabled, false) . ' />';
+    echo '<span class="description">启用后未开通网站会员的用户将无法使用对话功能</span>';
+}
+function deepseek_vip_keyword_callback() {
+    $keyword = get_option('deepseek_vip_keyword', '升级VIP享受精彩下载');
+    echo '<input type="text" name="deepseek_vip_keyword" value="' . esc_attr($keyword) . '" style="width:400px;" />';
+    echo '<span class="description">设置会员验证时的提示关键词，需要你网站带会员级别系统，且有关键词</span>';
+}
+function deepseek_vip_prompt_page_callback() {
+    $page_url = get_option('deepseek_vip_prompt_page', '');
+    echo '<input type="text" name="deepseek_vip_prompt_page" value="' . esc_attr($page_url) . '" style="width:400px;" />';
+    echo '<span class="description">用户点击开通按钮后跳转的页面URL</span>';
+}
 
 // 文件上传相关回调函数
 function enable_file_upload_callback() {
@@ -423,6 +466,8 @@ function chat_interfaces_callback() {
         'deepseek' => 'DeepSeek',
         'openai' => 'OpenAI',
         'grok' => 'Grok',
+        'gemini' => 'Gemini',
+        'claude' => 'Claude',
         'qwen' => '通义千问',
         'kimi' => 'Kimi',
         'doubao' => '豆包AI',
@@ -452,6 +497,8 @@ function default_chat_interface_callback() {
         'deepseek' => 'DeepSeek',
         'openai' => 'OpenAI',
         'grok' => 'Grok',
+        'gemini' => 'Gemini',
+        'claude' => 'Claude',
         'qwen' => '通义千问',
         'kimi' => 'Kimi',
         'doubao' => '豆包AI',
@@ -702,6 +749,26 @@ function pollinations_model_callback() {
     $model = get_option('pollinations_model', 'flux'); // 默认模型为flux
     echo '<input type="text" name="pollinations_model" value="' . esc_attr($model) . '" style="width: 500px;" />';
     echo '<p class="description">可用模型参考: <a href="https://image.pollinations.ai/models" target="_blank">Pollinations Models</a>，默认: flux，使用Pollinations最好是海外服务器，内地服务器请注意请求时间。</p>';
+}
+
+// Gemini 回调函数
+function gemini_api_key_callback() {
+    $api_key = get_option('gemini_api_key');
+    echo '<input type="text" name="gemini_api_key" value="' . esc_attr($api_key) . '" style="width: 500px;" />';
+}
+function gemini_model_callback() {
+    $model = get_option('gemini_model', 'gemini-2.0-flash');
+    echo '<input type="text" name="gemini_model" value="' . esc_attr($model) . '" style="width: 500px;" />';
+}
+
+// Claude 回调函数
+function claude_api_key_callback() {
+    $api_key = get_option('claude_api_key');
+    echo '<input type="text" name="claude_api_key" value="' . esc_attr($api_key) . '" style="width: 500px;" />';
+}
+function claude_model_callback() {
+    $model = get_option('claude_model', 'claude-3-7-sonnet-20250219');
+    echo '<input type="text" name="claude_model" value="' . esc_attr($model) . '" style="width: 500px;" />';
 }
 
 // 讯飞回调函数
@@ -1078,7 +1145,7 @@ function deepseek_handle_file_upload() {
         $is_doc_supported = in_array($model, $support_doc_models[$interface]);
     }
     if (!$is_doc_supported) {
-        wp_send_json_error(['message' => '该模型不支持分析文档']);
+        wp_send_json_error(['message' => '该模型不支持分析文档，请使用Kimi或者通义千问的qwen-long模型']);
         return;
     }
 
@@ -1231,7 +1298,7 @@ function deepseek_chat_shortcode() {
             <?php if (is_user_logged_in()): ?>
                 <button id="deepseek-new-chat">开启新对话</button>
                 <?php if (get_option('enable_intelligent_agent', '0') == '1'): ?>
-                    <h3 id="deepseek-agent-title" style="cursor: pointer;">智能体应用</h3>
+                    <div id="deepseek-agent-title" class="deepseek-agent-title" style="cursor: pointer;">智能体应用</div>
                     <?php 
                     if (get_option('enable_custom_entry', '0') == '1') {
                         $custom_title = get_option('custom_entry_title', '');
@@ -1316,6 +1383,8 @@ function deepseek_chat_shortcode() {
                                     'deepseek' => 'DeepSeek',
                                     'openai' => 'OpenAI',
                                     'grok' => 'Grok',
+                                    'gemini' => 'Gemini',
+                                    'claude' => 'Claude',
                                     'qwen' => '通义千问',
                                     'kimi' => 'Kimi',
                                     'doubao' => '豆包AI',
@@ -1410,6 +1479,8 @@ function deepseek_chat_shortcode() {
             'kimi': '<?php echo get_option('kimi_model', ''); ?>',
             'openai': '<?php echo get_option('openai_model', ''); ?>',
             'grok': '<?php echo get_option('grok_model', ''); ?>',
+            'gemini': '<?php echo get_option('gemini_model', 'gemini-2.0-flash'); ?>',
+            'claude': '<?php echo get_option('claude_model', 'claude-3-7-sonnet-20250219'); ?>', 
             'qianfan': '<?php echo get_option('qianfan_model', ''); ?>',
             'hunyuan': '<?php echo get_option('hunyuan_model', ''); ?>',
             'xunfei': '<?php echo get_option('xunfei_model', 'generalv3.5'); ?>',
@@ -1470,6 +1541,12 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
         case 'grok':
             $model_list = explode(',', get_option('grok_model', ''));
             break;
+        case 'gemini':
+            $model_list = explode(',', get_option('gemini_model', 'gemini-2.0-flash'));
+            break;
+        case 'claude':
+            $model_list = explode(',', get_option('claude_model', 'claude-3-7-sonnet-20250219'));
+            break;            
         case 'qianfan':
             $model_list = explode(',', get_option('qianfan_model', ''));
             break;
@@ -1657,6 +1734,14 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
             $api_key = get_option('grok_api_key');
             $api_url = 'https://api.x.ai/v1/chat/completions';
             break;
+        case 'gemini':
+            $api_key = get_option('gemini_api_key');
+            $api_url = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+            break;
+        case 'claude':
+            $api_key = get_option('claude_api_key');
+            $api_url = 'https://api.anthropic.com/v1/messages';
+            break;            
         case 'qianfan':
             $api_key = get_option('qianfan_api_key');
             $api_url = 'https://qianfan.baidubce.com/v2/chat/completions';
@@ -1696,7 +1781,9 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
         
         foreach ($history as $item) {
             $messages[] = ['role' => 'user', 'content' => $item->message];
-            $messages[] = ['role' => 'assistant', 'content' => $item->response];
+            $response = json_decode($item->response, true);
+            $content = is_array($response) && isset($response['content']) ? $response['content'] : $item->response;
+            $messages[] = ['role' => 'assistant', 'content' => $content];
         }
     }
 
@@ -1714,7 +1801,7 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
         if (!$is_doc_supported) {
             return new WP_REST_Response([
                 'success' => false,
-                'message' => '该模型不支持分析文档'
+                'message' => '该模型不支持分析文档，请选择Kimi或者通义千问的qwen-long模型'
             ], 400);
         }
 
@@ -1786,11 +1873,27 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
     }
 
     // 构建请求数据
-    $data = [
-        'model' => $model,
-        'messages' => $messages,
-        'stream' => true
-    ];
+    if ($interface_choice === 'claude') {
+        // Claude使用自己的消息格式
+        $data = [
+            'model' => $model,
+            'max_tokens' => 4096, // Claude的token限制
+            'messages' => array_map(function($msg) {
+                return [
+                    'role' => $msg['role'] === 'system' ? 'system' : ($msg['role'] === 'user' ? 'user' : 'assistant'),
+                    'content' => $msg['content']
+                ];
+            }, $messages),
+            'stream' => true
+        ];
+    } else {
+        // OpenAI接口
+        $data = [
+            'model' => $model,
+            'messages' => $messages,
+            'stream' => true
+        ];
+    }
 
     // 如果启用了联网搜索，且当前是讯飞星火接口，则启用讯飞的web_search
     $qwen_enable_search = get_option('qwen_enable_search', '0');
@@ -1824,14 +1927,15 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Content-Type: application/json',
         'Authorization: Bearer ' . $api_key,
-        'Connection: close'
+        $interface_choice === 'claude' ? 'x-api-key: ' . $api_key : '', // Claude x-api-key
+        $interface_choice === 'claude' ? 'anthropic-version: 2023-06-01' : '' // Claude API版本
     ]);
     curl_setopt($ch, CURLOPT_POST, 1);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
     curl_setopt($ch, CURLOPT_FRESH_CONNECT, true);
     curl_setopt($ch, CURLOPT_FORBID_REUSE, true);
-    curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($ch, $chunk) use (&$fullReply) {
+    curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($ch, $chunk) use (&$fullReply, $interface_choice) {
         echo $chunk;
         if (ob_get_level() > 0) {
             ob_flush();
@@ -1859,19 +1963,36 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
 
     foreach ($lines as $line) {
         $line = trim($line);
-        if (strpos($line, 'data:') === 0) {
-            $dataPart = trim(substr($line, 5));
-            if ($dataPart === '[DONE]') {
-                continue;
-            }
-            $jsonData = json_decode($dataPart, true);
-            if ($jsonData && isset($jsonData['choices'][0]['delta'])) {
-                $delta = $jsonData['choices'][0]['delta'];
-                if (isset($delta['content'])) {
-                    $processedReply['content'] .= $delta['content'];
+        if ($interface_choice === 'claude') {
+            // Claude流式输出格式
+            if (strpos($line, 'data:') === 0) {
+                $dataPart = trim(substr($line, 5));
+                if ($dataPart === '[DONE]') {
+                    continue;
                 }
-                if (isset($delta['reasoning_content'])) {
-                    $processedReply['reasoning_content'] .= $delta['reasoning_content'];
+                $jsonData = json_decode($dataPart, true);
+                if ($jsonData && isset($jsonData['type'])) {
+                    if ($jsonData['type'] === 'content_block_delta' && isset($jsonData['delta']['text'])) {
+                        $processedReply['content'] .= $jsonData['delta']['text'];
+                    }
+                }
+            }
+        } else {
+            // OpenAI兼容格式
+            if (strpos($line, 'data:') === 0) {
+                $dataPart = trim(substr($line, 5));
+                if ($dataPart === '[DONE]') {
+                    continue;
+                }
+                $jsonData = json_decode($dataPart, true);
+                if ($jsonData && isset($jsonData['choices'][0]['delta'])) {
+                    $delta = $jsonData['choices'][0]['delta'];
+                    if (isset($delta['content'])) {
+                        $processedReply['content'] .= $delta['content'];
+                    }
+                    if (isset($delta['reasoning_content'])) {
+                        $processedReply['reasoning_content'] .= $delta['reasoning_content'];
+                    }
                 }
             }
         }
@@ -2134,6 +2255,74 @@ function deepseek_render_logs_page() {
         </div>
     </div>
     <?php
+}
+
+// 会员验证功能实现
+add_action('template_redirect', 'deepseek_start_output_buffer');
+function deepseek_start_output_buffer() {
+    if (is_admin()) return;
+
+    $deepseek_vip_check_enabled = get_option('deepseek_vip_check_enabled');
+    if (!$deepseek_vip_check_enabled) return;
+
+    global $post;
+    if (is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'deepseek_chat') && is_user_logged_in()) {
+        ob_start();
+        add_action('shutdown', 'deepseek_check_vip_prompt', 0);
+    }
+}
+
+// 会员验证弹窗
+function deepseek_check_vip_prompt() {
+    $deepseekhtml = ob_get_clean();
+
+    $deepseek_target_string = get_option('deepseek_vip_keyword', '升级VIP享受精彩下载');  // 默认值为 "升级VIP享受精彩下载" Modown主题是这个
+    $deepseek_vip_prompt_page = get_option('deepseek_vip_prompt_page');
+
+    if (strpos($deepseekhtml, $deepseek_target_string) !== false && !empty($deepseek_vip_prompt_page)) {
+        $deepseekprompt = '
+        <div id="vip-prompt-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:99998;backdrop-filter:blur(3px);">
+            <div id="vip-prompt" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;padding:30px 40px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,0.2);text-align:center;z-index:99999;min-width:380px;">
+                <h3 style="margin:0 0 20px 0;font-size:20px;color:#333;">&#128274; 会员专属功能</h3>
+                <p style="margin:0 0 25px 0;font-size:16px;color:#666;">请先开通会员才能使用ai生成PPT服务</p>
+                <div style="display:flex;gap:15px;justify-content:center;">
+                    <button onclick="handleVipAction(\'confirm\')" style="padding:12px 30px;background:#0073aa;color:#fff;border:none;border-radius:25px;cursor:pointer;font-size:16px;transition:all 0.3s;flex:1;">
+                        &#128640; 立即开通
+                    </button>
+                </div>
+            </div>
+        </div>
+        <script>
+            // 禁止滚动条出现
+            document.body.style.overflow = "hidden";
+            
+            // 统一操作处理
+            function handleVipAction(type) {
+                const overlay = document.getElementById("vip-prompt-overlay");
+                if (type === "confirm") {
+                    window.location.href = "'.esc_url($deepseek_vip_prompt_page).'";
+                } else {
+                    overlay.style.display = "none";
+                    document.body.style.overflow = "auto";
+                }
+            }
+
+            // 禁用ESC键关闭
+            document.addEventListener("keydown", function(e) {
+                if (e.key === "Escape") {
+                    e.preventDefault();
+                }
+            });
+
+            // 禁用右键菜单
+            document.addEventListener("contextmenu", function(e) {
+                e.preventDefault();
+            }, false);
+        </script>';
+        
+        $deepseekhtml = str_replace('</body>', $deepseekprompt.'</body>', $deepseekhtml);
+    }
+    echo $deepseekhtml;
 }
 // 对话 结束
 

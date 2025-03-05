@@ -320,23 +320,84 @@ body {
 
 /* ai对话框语音朗读按钮 */
 .ai-tts-play {
-    display: inline-block;
-    padding: 5px 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 25px;
     background-color: #267ad1;
     color: #fff;
     border: none;
     border-radius: 5px;
     cursor: pointer;
     font-size: 16px;
-    text-align: center;
-    line-height: 1;
+    transition: background 0.2s ease, transform 0.1s ease;
+    position: relative;
+    bottom: 2.2px;
 }
-.ai-tts-play:hover {
-    background-color: #005177;
-}
-/* ai对话框语音朗读按钮 */
 
-/* 复制按钮样式 */
+.ai-tts-play:hover {
+    background-color: #1a5a9e;
+    transform: scale(1.1);
+}
+
+.ai-tts-play:active {
+    transform: scale(0.95);
+}
+
+/* 复制普通内容按钮 */
+.bot-copy-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 25px;
+    margin-left: 10px;
+    background-color: #4a90e2;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.1s ease;
+    position: relative;
+    bottom: 2.3px;
+}
+
+.bot-copy-button:hover {
+    background-color: #357abd;
+    transform: scale(1.1);
+}
+
+.bot-copy-button:active {
+    transform: scale(0.95);
+}
+
+/* 点击后的状态 */
+.bot-copy-button.clicked {
+    width: 80px;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    background-color: #357abd;
+}
+
+/*气泡样式 */
+.tooltip {
+    position: absolute;
+    background: #333;
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    z-index: 1000;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none; /* 防止影响鼠标事件 */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+/* 语音、复制普通内容、气泡按钮end */
+
+/* pre复制按钮样式 */
 .pre-copy-button {
     display: inline-block;
     background: linear-gradient(90deg, #0073aa, #005177);
@@ -514,28 +575,24 @@ body {
 /* 底部状态栏样式结束 */
 
 /* 智能体应用标题 */
-#deepseek-agent-title::before {
-    display: none !important;
-}
-
-#deepseek-agent-title {
+.deepseek-agent-title {
     display: block;
-    background: linear-gradient(135deg, #4CAF50, #2E8B57) !important;
+    background: linear-gradient(135deg, #4CAF50, #2E8B57);
     color: white;
     padding: 2px 25px;
     border-radius: 8px;
     text-align: center;
     font-weight: bold;
-    font-size: 18px;
+    font-size: 16px;
     cursor: pointer;
     transition: all 0.3s ease-in-out;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-    margin: 15px auto;
-    width: 160px; /* 设置固定宽度 */
+    margin: 10px auto;
+    width: 160px;
     box-sizing: border-box; /* 确保padding不影响宽度 */
 }
 
-#deepseek-agent-title:hover {
+.deepseek-agent-title:hover {
     background: linear-gradient(135deg, #45a049, #1e7b50);
     transform: scale(1.05);
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
@@ -935,7 +992,7 @@ body {
     transition: all 0.3s ease-in-out;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
     margin: 10px auto;
-    width: 160px; /* 与智能体应用标题保持一致的宽度 */
+    width: 160px;
     box-sizing: border-box; /* 确保padding不影响宽度 */
     text-decoration: none !important;
 }
@@ -1237,4 +1294,24 @@ body {
         font-size: 14px;
         margin-bottom: 8px;
     } 
+
+    .ai-tts-play {
+        width: 28px;
+        height: 20px;
+        font-size: 13px;
+        margin-left: 5px;
+    }
+
+    .bot-copy-button {
+        width: 28px;
+        height: 20px;
+        font-size: 13px;
+        margin-left: 5px;
+        position: relative;
+        bottom: 2px;
+    }
+
+    .tooltip {
+        display: none;
+    }        
 }

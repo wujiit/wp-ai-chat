@@ -142,6 +142,13 @@ function addVoicePlayback(container, text) {
     playIcon.classList.add('ai-tts-play');
     playIcon.innerHTML = '&#128266;';
     playIcon.style.marginLeft = '10px';
+
+    // 添加tooltip功能
+    playIcon.addEventListener('mouseover', function(e) {
+        showTooltip(e, '语音播放内容', playIcon);
+    });
+    playIcon.addEventListener('mouseout', hideTooltip);
+
     playIcon.addEventListener('click', function() {
         var audioElem = document.getElementById('ai-tts-audio');
         if (!audioElem) {
@@ -215,6 +222,9 @@ function addVoicePlayback(container, text) {
         });
     });
     container.appendChild(playIcon);
+
+    // 添加复制按钮
+    addBotCopyButton(container, text);    
 }
 
 // 自定义通知
@@ -365,7 +375,7 @@ function updateUploadedFilesList() {
     });
 }
 
-// 处理发送消息接口
+// 处理发送消息
 function handleSendMessage() {
     var message = document.getElementById('deepseek-chat-input').value.trim();
     if (!message && uploadedFiles.length === 0) return;
@@ -766,7 +776,7 @@ function addCopyButtonsToPreTags(container) {
     const preTags = container.querySelectorAll('pre');
     preTags.forEach(pre => {
         const copyButton = document.createElement('button');
-        copyButton.textContent = '一键复制';
+        copyButton.textContent = '复制里面内容';
         copyButton.classList.add('pre-copy-button');
         copyButton.addEventListener('click', () => {
             const textToCopy = pre.textContent;
@@ -861,6 +871,86 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// 复制普通内容按钮函数
+function addBotCopyButton(container, content) {
+    const copyButton = document.createElement('button');
+    copyButton.innerHTML = '&#128196;';
+    copyButton.classList.add('bot-copy-button');
+
+    // 添加tooltip功能
+    copyButton.addEventListener('mouseover', function(e) {
+        showTooltip(e, '复制内容', copyButton);
+    });
+    copyButton.addEventListener('mouseout', hideTooltip);
+
+    // 检查内容是否包含图片
+    const img = container.querySelector('img');
+    const textToCopy = img ? img.src : content;
+
+    copyButton.addEventListener('click', () => {
+        copyButton.classList.add('clicked');
+        navigator.clipboard.writeText(textToCopy)
+            .then(() => {
+                const originalText = copyButton.textContent;
+                copyButton.innerHTML = '复制成功'; // 复制成功后显示对勾图标
+                setTimeout(() => {
+                copyButton.innerHTML = '&#128196;';
+                copyButton.classList.remove('clicked');
+                }, 1500); // 恢复原图标
+            })
+            .catch(err => console.error('复制失败: ', err));
+    });
+    
+    // 复制按钮放在语音按钮旁边
+    const voiceButton = container.querySelector('.ai-tts-play');
+    if (voiceButton) {
+        voiceButton.insertAdjacentElement('afterend', copyButton);
+    } else {
+        container.appendChild(copyButton);
+    }
+}
+
+// tooltip函数
+function showTooltip(event, text, element) {
+    let tooltip = document.querySelector('.tooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.classList.add('tooltip');
+        document.body.appendChild(tooltip);
+    }
+
+    tooltip.textContent = text;
+    tooltip.style.position = 'absolute';
+    tooltip.style.background = '#333';
+    tooltip.style.color = '#fff';
+    tooltip.style.padding = '5px 10px';
+    tooltip.style.borderRadius = '4px';
+    tooltip.style.fontSize = '12px';
+    tooltip.style.zIndex = '1000';
+    tooltip.style.whiteSpace = 'nowrap';
+    tooltip.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+
+    const rect = element.getBoundingClientRect();
+    tooltip.style.top = (rect.top + window.scrollY - 30) + 'px';
+    tooltip.style.left = (rect.left + window.scrollX + (rect.width - tooltip.offsetWidth) / 2) + 'px'; // 水平居中
+
+    tooltip.style.opacity = '1';
+    tooltip.style.transition = 'opacity 0.2s ease';
+}
+
+// 隐藏tooltip函数
+function hideTooltip() {
+    const tooltip = document.querySelector('.tooltip');
+    if (tooltip) {
+        tooltip.style.opacity = '0';
+        setTimeout(() => {
+            if (tooltip.parentNode) {
+                tooltip.parentNode.removeChild(tooltip);
+            }
+        }, 200);
+    }
+}
 
 // 自定义提示词点击事件
 document.addEventListener('DOMContentLoaded', function() {
