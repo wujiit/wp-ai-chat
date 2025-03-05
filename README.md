@@ -3,7 +3,7 @@
 # 小半WordPress ai助手  
 
 [![License](https://img.shields.io/badge/license-GPL-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.9.8-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/3.9.8)
+[![Version](https://img.shields.io/badge/version-3.9.9-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/3.9.9)
 [![WordPress](https://img.shields.io/badge/WordPress-6.7-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.0-orange.svg)](https://www.php.net/)
 [![Nginx](https://img.shields.io/badge/Nginx-1.2-green.svg)](https://nginx.org/)
@@ -27,6 +27,8 @@
 1. 内置OpenAI文本接口  
 1. 内置腾讯混元文本接口  
 1. 内置Grok文本接口  
+1. 内置Gemini文本接口 
+1. 内置Claude文本接口 
 1. 内置讯飞星火文本接口  
 1. 内置自定义AI文本模型接口  
 1. 支持阿里智能体应用对接  
