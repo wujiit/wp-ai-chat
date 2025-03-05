@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 3.9.7
+Version: 3.9.8
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -202,11 +202,13 @@ function deepseek_register_settings() {
     register_setting('deepseek_chat_options_group', 'qianfan_model', array('sanitize_callback' => 'sanitize_text_field')); // 千帆 模型参数
     register_setting('deepseek_chat_options_group', 'hunyuan_api_key'); // 腾讯混元 API Key
     register_setting('deepseek_chat_options_group', 'hunyuan_model', array('sanitize_callback' => 'sanitize_text_field')); // 腾讯混元 模型参数
+    register_setting('deepseek_chat_options_group', 'xunfei_api_key'); // 讯飞星火 API Key
+    register_setting('deepseek_chat_options_group', 'xunfei_model', array('sanitize_callback' => 'sanitize_text_field')); // 讯飞星火模型参数   
+
     // 通义千问文本和图像
     register_setting('deepseek_chat_options_group', 'qwen_api_key'); // 通义千问 API Key
     register_setting('deepseek_chat_options_group', 'qwen_text_model', array('sanitize_callback' => 'sanitize_text_field')); // 通义千问 文本模型
     register_setting('deepseek_chat_options_group', 'qwen_image_model', array('sanitize_callback' => 'sanitize_text_field')); // 通义千问 图像模型
-    register_setting('deepseek_chat_options_group', 'qwen_enable_search'); // 通义千问联网搜索
 
     // 自定义模型设置
     register_setting('deepseek_chat_options_group', 'custom_api_key');       // 自定义模型API Key
@@ -226,6 +228,8 @@ function deepseek_register_settings() {
     register_setting('deepseek_chat_options_group', 'keyword_list'); // 违规关键词列表
     register_setting('deepseek_chat_options_group', 'enable_intelligent_agent'); // 启用智能体应用
     register_setting('deepseek_chat_options_group', 'deepseek_login_prompt'); // 未登录提示
+    register_setting('deepseek_chat_options_group', 'qwen_enable_search'); // 模型联网搜索
+
     //自定义按钮位置设置（右边距和底边距）    
     register_setting('deepseek_chat_options_group', 'ai_helper_right');
     register_setting('deepseek_chat_options_group', 'ai_helper_bottom');
@@ -285,11 +289,14 @@ function deepseek_register_settings() {
     add_settings_field('hunyuan_api_key', '腾讯混元 API Key', 'hunyuan_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
     add_settings_field('hunyuan_model', '腾讯混元 模型参数', 'hunyuan_model_callback', 'deepseek-chat', 'deepseek_main_section');
 
+    // 讯飞 AI配置项
+    add_settings_field('xunfei_api_key', '讯飞星火 API Key', 'xunfei_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
+    add_settings_field('xunfei_model', '讯飞星火 模型参数', 'xunfei_model_callback', 'deepseek-chat', 'deepseek_main_section');
+
     // 通义千问配置项
     add_settings_field('qwen_api_key', '通义千问 API Key', 'qwen_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
     add_settings_field('qwen_text_model', '通义千问 文本模型参数', 'qwen_text_model_callback', 'deepseek-chat', 'deepseek_main_section');
     add_settings_field('qwen_image_model', '通义千问 图像模型参数', 'qwen_image_model_callback', 'deepseek-chat', 'deepseek_main_section');
-    add_settings_field('qwen_enable_search', '启用通义千问联网搜索', 'qwen_enable_search_callback', 'deepseek-chat', 'deepseek_main_section');
 
     // 自定义模型配置项
     add_settings_field('custom_api_key', '自定义模型 API Key', 'custom_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
@@ -348,6 +355,9 @@ function deepseek_register_settings() {
 
     // 接口切换显示开关
     add_settings_field('show_interface_switch', '前台显示接口切换', 'show_interface_switch_callback', 'deepseek-chat', 'deepseek_main_section');
+
+    // 在线联网搜索
+    add_settings_field('qwen_enable_search', '启用在线联网搜索', 'qwen_enable_search_callback', 'deepseek-chat', 'deepseek_main_section');
 
     // 用户选择接口的处理
     add_action('wp_ajax_deepseek_switch_interface', 'deepseek_handle_interface_switch');
@@ -418,6 +428,7 @@ function chat_interfaces_callback() {
         'doubao' => '豆包AI',
         'qianfan' => '千帆(文心一言)',
         'hunyuan' => '腾讯混元',
+        'xunfei' => '讯飞星火',
         'pollinations' => 'Pollinations (文生图)',
         'custom' => '自定义接口'
     );
@@ -446,6 +457,7 @@ function default_chat_interface_callback() {
         'doubao' => '豆包AI',
         'qianfan' => '千帆(文心一言)',
         'hunyuan' => '腾讯混元',
+        'xunfei' => '讯飞星火',
         'pollinations' => 'Pollinations (文生图)',
         'custom' => '自定义接口'
     );
@@ -482,6 +494,7 @@ function summary_interface_choice_callback() {
         <option value="qwen" <?php selected($choice, 'qwen'); ?>>通义千问</option>
         <option value="qianfan" <?php selected($choice, 'qianfan'); ?>>千帆(文心一言)</option>
         <option value="hunyuan" <?php selected($choice, 'hunyuan'); ?>>腾讯混元</option>
+        <option value="xunfei" <?php selected($choice, 'xunfei'); ?>>讯飞星火</option>
         <option value="custom" <?php selected($choice, 'custom'); ?>>自定义接口</option>
     </select>
     <p class="description">选择用于生成文章总结的AI接口，需要长文本模型，多模型参数默认采用第一个</p>
@@ -691,6 +704,16 @@ function pollinations_model_callback() {
     echo '<p class="description">可用模型参考: <a href="https://image.pollinations.ai/models" target="_blank">Pollinations Models</a>，默认: flux，使用Pollinations最好是海外服务器，内地服务器请注意请求时间。</p>';
 }
 
+// 讯飞回调函数
+function xunfei_api_key_callback() {
+    $api_key = get_option('xunfei_api_key');
+    echo '<input type="text" name="xunfei_api_key" value="' . esc_attr($api_key) . '" style="width: 500px;" />';
+}
+function xunfei_model_callback() {
+    $model = get_option('xunfei_model', 'generalv3.5');
+    echo '<input type="text" name="xunfei_model" value="' . esc_attr($model) . '" style="width: 500px;" />';
+}
+
 // 通义千问相关回调
 function qwen_api_key_callback() {
     $api_key = get_option('qwen_api_key');
@@ -711,9 +734,12 @@ function qwen_enable_image_callback() {
 }
 function qwen_enable_search_callback() {
     $enabled = get_option('qwen_enable_search', 0);
-    $checked = $enabled ? 'checked' : '';
-    echo '<input type="checkbox" name="qwen_enable_search" value="1" ' . $checked . ' /> 仅通义千问部分模型支持';
+    ?>
+    <input type="checkbox" name="qwen_enable_search" value="1" <?php checked(1, $enabled); ?> />
+    <p class="description">仅通义千问qwen-max、qwen-plus、qwen-turbo和讯飞星火Pro、Max、4.0Ultra模型支持（模型的联网搜索和智能体应用的联网搜索不一样）</p>
+    <?php
 }
+
 
 // 自定义模型相关回调
 function custom_api_key_callback() {
@@ -813,7 +839,7 @@ function deepseek_api_key_callback() {
 function deepseek_model_callback() {
     $model = get_option('deepseek_model', 'deepseek-chat'); // 默认模型为deepseek-chat
     echo '<input type="text" name="deepseek_model" value="' . esc_attr($model) . '" style="width: 500px;" />';
-    echo '<p class="description" style="color: red;">多个参数用英文逗号分隔，第一个为默认参数，例如：deepseek-chat,deepseek-coder</p>';    
+    echo '<p class="description" style="color: red;">多个参数用英文逗号分隔，第一个为默认参数，其他模型也一样，例如：deepseek-chat,deepseek-coder</p>';    
 }
 
 // 获取DeepSeek余额信息
@@ -1295,6 +1321,7 @@ function deepseek_chat_shortcode() {
                                     'doubao' => '豆包AI',
                                     'qianfan' => '文心一言',
                                     'hunyuan' => '腾讯混元',
+                                    'xunfei' => '讯飞星火',
                                     'pollinations' => '英文生图',
                                     'custom' => '备份接口'
                                 );
@@ -1385,6 +1412,7 @@ function deepseek_chat_shortcode() {
             'grok': '<?php echo get_option('grok_model', ''); ?>',
             'qianfan': '<?php echo get_option('qianfan_model', ''); ?>',
             'hunyuan': '<?php echo get_option('hunyuan_model', ''); ?>',
+            'xunfei': '<?php echo get_option('xunfei_model', 'generalv3.5'); ?>',
             'qwen': '<?php echo get_option('qwen_text_model', 'qwen-max') . ',' . get_option('qwen_image_model', 'wanx2.1-t2i-turbo'); ?>',
             'pollinations': '<?php echo get_option('pollinations_model', 'flux'); ?>',
             'custom': '<?php echo get_option('custom_model_params', ''); ?>'
@@ -1448,6 +1476,9 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
         case 'hunyuan':
             $model_list = explode(',', get_option('hunyuan_model', ''));
             break;
+        case 'xunfei':
+            $model_list = explode(',', get_option('xunfei_model', 'generalv3.5'));
+            break;    
         case 'pollinations':
             $model_list = explode(',', get_option('pollinations_model', 'flux'));
             break;    
@@ -1630,6 +1661,10 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
             $api_key = get_option('qianfan_api_key');
             $api_url = 'https://qianfan.baidubce.com/v2/chat/completions';
             break;
+        case 'xunfei':
+            $api_key = get_option('xunfei_api_key');
+            $api_url = 'https://spark-api-open.xf-yun.com/v1/chat/completions';
+            break;    
         case 'qwen':
             $api_key = get_option('qwen_api_key');
             $api_url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
@@ -1754,9 +1789,23 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
     $data = [
         'model' => $model,
         'messages' => $messages,
-        'stream' => true,
-        'enable_search' => $interface_choice === 'qwen' && get_option('qwen_enable_search') && $enable_search
+        'stream' => true
     ];
+
+    // 如果启用了联网搜索，且当前是讯飞星火接口，则启用讯飞的web_search
+    $qwen_enable_search = get_option('qwen_enable_search', '0');
+    if ($interface_choice === 'xunfei' && $qwen_enable_search == '1' && $enable_search) {
+        $data['tools'] = [
+            [
+                'type' => 'web_search',
+                'web_search' => [
+                    'enable' => true
+                ]
+            ]
+        ];
+    } elseif ($interface_choice === 'qwen' && $qwen_enable_search == '1' && $enable_search) {
+        $data['enable_search'] = true; // 通义千问的联网搜索参数
+    }
 
     // 清空缓冲区，设置流式响应头
     if (ob_get_length()) { ob_end_clean(); }
@@ -2175,7 +2224,12 @@ function deepseek_call_ai_api($content, $interface_type = 'summary') {
             $api_key = get_option('qianfan_api_key');
             $model_string = get_option('qianfan_model', '');
             $url = 'https://qianfan.baidubce.com/v2/chat/completions';
-            break;                                       
+            break;
+        case 'xunfei':
+            $api_key = get_option('xunfei_api_key');
+            $model_string = get_option('xunfei_model', '');
+            $url = 'https://spark-api-open.xf-yun.com/v1/chat/completions';
+            break;                                               
         case 'custom':
             $api_key = get_option('custom_api_key');
             $model_string = get_option('custom_model_params', '');
