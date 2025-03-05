@@ -2266,7 +2266,8 @@ function deepseek_start_output_buffer() {
     if (!$deepseek_vip_check_enabled) return;
 
     global $post;
-    if (is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'deepseek_chat') && is_user_logged_in()) {
+    // 只在页面类型执行
+    if (is_page() && is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'deepseek_chat') && is_user_logged_in()) {
         ob_start();
         add_action('shutdown', 'deepseek_check_vip_prompt', 0);
     }
