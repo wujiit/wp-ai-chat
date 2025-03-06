@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 3.9.9
+Version: 3.9.9.1
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -1948,6 +1948,16 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
     $curl_result = curl_exec($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
+
+    // 调试日志记录 - wp-config.php配置里面开了才记录
+    if (defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+        $log_data = [
+            'timestamp' => current_time('mysql'),
+            'request' => $data,
+            'raw_response' => $fullReply
+        ];
+        error_log("[AI_REQUEST_DEBUG] " . json_encode($log_data) . "\n", 3, WP_CONTENT_DIR . '/debug.log');
+    }
 
     if ($curl_result === false || $http_code != 200) {
         $error_msg = "API request failed with HTTP code: $http_code";
