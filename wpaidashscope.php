@@ -367,6 +367,14 @@ function deepseek_render_agents_page() {
             font-size: 24px;
             color: #333;
         }
+        .dashscope-section {
+            margin-bottom: 30px;
+        }
+        .dashscope-section h2 {
+            font-size: 20px;
+            color: #444;
+            margin-bottom: 15px;
+        }
         .dashscope-wrap table {
             width: 100%;
             border-collapse: collapse;
@@ -415,15 +423,25 @@ function deepseek_render_agents_page() {
     <div class="dashscope-wrap">
         <h1>智能体应用管理</h1>
         <form method="post" action="options.php">
-            <?php
-            settings_fields('deepseek_agents_group');
-            do_settings_sections('deepseek-agents');
-            submit_button('保存设置');
-            ?>
+            <?php settings_fields('deepseek_agents_group'); ?>
+            
+            <div class="dashscope-section">
+                <h2>智能体配置</h2>
+                <?php
+                do_settings_sections('deepseek-agents');
+                ?>
+                <p>支持阿里、腾讯、火山引擎和扣子平台的智能体应用。阿里API Key就是百炼里面的，腾讯需为每个智能体单独设置Token，火山引擎和模型apikey一样，扣子的个人访问令牌Token需定期更换。</p>
+            </div>
+
+            <div class="dashscope-section">
+                <h2>智能体应用列表</h2>
+                <?php deepseek_agents_list_callback(); ?>
+            </div>
+
+            <?php submit_button('保存设置'); ?>
         </form>
         <div class="success-message" <?php echo $saved ? 'style="display: block;"' : ''; ?>>设置已保存</div>
-        <p>支持阿里、腾讯、火山引擎和扣子平台的智能体应用。阿里API Key就是百炼里面的，腾讯需为每个智能体单独设置Token，火山引擎和模型apikey一样，扣子的个人访问令牌Token需定期更换。
-            <br>暂时只支持普通对话，部分插件可能不支持，已测试支持联网搜索插件。</p>
+        <p>暂时只支持普通对话，不支持使用了插件的智能体应用，(支持联网搜索插件)。</p>
     </div>
 
     <?php if ($saved) : ?>
@@ -554,11 +572,10 @@ function deepseek_register_agents_settings() {
     register_setting('deepseek_agents_group', 'deepseek_agents', 'deepseek_sanitize_agents');
     register_setting('deepseek_agents_group', 'volc_agent_api_key', 'sanitize_text_field');
 
-    add_settings_section('deepseek_agents_section', '智能体配置', null, 'deepseek-agents');
+    add_settings_section('deepseek_agents_section', '', null, 'deepseek-agents');
     add_settings_field('ali_agent_api_key', '阿里智能体API KEY', 'ali_agent_api_key_callback', 'deepseek-agents', 'deepseek_agents_section');
     add_settings_field('volc_agent_api_key', '火山引擎API Key', 'volc_agent_api_key_callback', 'deepseek-agents', 'deepseek_agents_section');
     add_settings_field('coze_access_token', '扣子访问令牌Token', 'coze_access_token_callback', 'deepseek-agents', 'deepseek_agents_section');
-    add_settings_field('deepseek_agents_list', '智能体应用列表', 'deepseek_agents_list_callback', 'deepseek-agents', 'deepseek_agents_section');
     
 }
 add_action('admin_init', 'deepseek_register_agents_settings');
@@ -570,13 +587,14 @@ function volc_agent_api_key_callback() {
     echo '<p class="description">输入火山引擎应用的API Key。</p>';
 }
 
-// 设置回调函数
+// 阿里API Key回调函数
 function ali_agent_api_key_callback() {
     $api_key = get_option('ali_agent_api_key');
     echo '<input type="text" name="ali_agent_api_key" value="' . esc_attr($api_key) . '" style="width: 500px;" />';
     echo '<p class="description">输入阿里智能体应用的API KEY。</p>';
 }
 
+// 扣子回调函数
 function coze_access_token_callback() {
     $token = get_option('coze_access_token');
     $expiry = get_option('coze_access_token_expiry');

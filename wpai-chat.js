@@ -24,6 +24,7 @@ function setCurrentPage(page) {
     currentPage = page;
     localStorage.setItem('currentPage', page);
     toggleClearButtonVisibility();
+    toggleOptionsVisibility(); // 更新选项栏显示
 }
 
 // 设置普通对话 ID
@@ -91,6 +92,8 @@ window.addEventListener('load', function() {
 
     // 初始化模型选择框
     updateModelSelectOptions();
+    // 初始化选项栏显示
+    toggleOptionsVisibility();
 });
 
 // 默认提示
@@ -1322,3 +1325,22 @@ function toggleClearButtonVisibility() {
 window.addEventListener('load', function() {
     toggleClearButtonVisibility();
 });
+
+// 控制选项栏特定板块的显示
+function toggleOptionsVisibility() {
+    const interfaceSelect = document.querySelector('.deepseek-interface-select');
+    const searchToggle = document.querySelector('.deepseek-search-toggle');
+    const uploadSection = document.querySelector('.upload-section');
+
+    // 如果当前是智能体页面，保持隐藏
+    if (currentPage === 'agent') {
+        if (interfaceSelect) interfaceSelect.style.display = 'none';
+        if (searchToggle) searchToggle.style.display = 'none';
+        if (uploadSection) uploadSection.style.display = 'none';
+    } else {
+        // 非智能体页面，恢复显示
+        if (interfaceSelect) interfaceSelect.style.display = '';
+        if (searchToggle) searchToggle.style.display = '';
+        if (uploadSection) uploadSection.style.display = '';
+    }
+}

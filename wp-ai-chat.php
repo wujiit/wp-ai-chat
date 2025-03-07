@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 3.9.9.1
+Version: 4.0
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -629,7 +629,7 @@ function ai_helper_name_callback() {
 function ai_helper_icon_callback() {
     $icon = get_option('ai_helper_icon', ''); // 默认空值
     echo '<input type="text" name="ai_helper_icon" value="' . esc_attr($icon) . '" style="width:300px;" />';
-    echo '<p class="description">输入图标图片的URL链接（建议尺寸约为24-32px）</p>';
+    echo '<p class="description">输入图标图片的URL链接</p>';
 }
 
 // AI助手按钮位置右边距回调函数
@@ -1373,7 +1373,7 @@ function deepseek_chat_shortcode() {
 
             <div id="deepseek-options-bar">
                 <?php if ($show_interface_switch == '1' && is_user_logged_in()): ?>
-                    <div class="deepseek-option-item deepseek-interface-select">
+                    <div class="deepseek-option-item deepseek-interface-select" style="display: none;">
                         <form id="interface-switch-form" method="post" action="">
                             <?php wp_nonce_field('interface_switch_action', 'interface_switch_nonce'); ?>
                             <label for="chat-interface-select">选择接口:</label>
@@ -1412,7 +1412,7 @@ function deepseek_chat_shortcode() {
                 <?php endif; ?>
 
                 <?php if (in_array('qwen', $enabled_interfaces) && $qwen_enable_search == '1'): ?>
-                    <div class="deepseek-option-item deepseek-search-toggle">
+                    <div class="deepseek-option-item deepseek-search-toggle" style="display: none;">
                         <label class="switch">
                             <input type="checkbox" id="enable-search">
                             <span class="slider round"></span>
@@ -1433,7 +1433,7 @@ function deepseek_chat_shortcode() {
                 <?php endif; ?>
                 
                 <?php if ($enable_file_upload == '1' && is_user_logged_in()): ?>
-                    <div class="deepseek-option-item upload-section">
+                    <div class="deepseek-option-item upload-section" style="display: none;">
                         <button id="deepseek-upload-file-btn">上传文件</button>
                         <input type="file" id="deepseek-file-input" multiple style="display: none;" />
                         <div id="uploaded-files-list"></div>
