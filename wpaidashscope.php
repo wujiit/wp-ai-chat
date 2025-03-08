@@ -48,6 +48,7 @@ function deepseek_send_agent_message(WP_REST_Request $request) {
     $message = sanitize_text_field($request->get_param('message'));
     $app_id = sanitize_text_field($request->get_param('app_id'));
     $session_id = $request->get_param('session_id');
+    $file_data = $request->get_param('file_data'); // 接收前端传来的文件数据
 
     $agents = get_option('deepseek_agents', []);
     $agent = array_filter($agents, function ($a) use ($app_id) {
@@ -185,18 +186,32 @@ function deepseek_send_agent_message(WP_REST_Request $request) {
                 "Authorization: Bearer $access_token",
                 "Content-Type: application/json; charset=UTF-8"
             ];
+
+            // 构造合并的additional_messages
+            $additional_messages = [];
+            $combined_content = '';
+            if ($file_data && $agent['enable_file_upload']) {
+            // 将文件URL添加到内容中
+                $combined_content .= $file_data['file_url'];
+            }
+            if ($message) {
+            // 如果有用户输入，将其与文件URL合并，添加空格分隔
+                $combined_content .= ($combined_content ? ' ' : '') . $message;
+            }
+            if ($combined_content) {
+                $additional_messages[] = [
+                    'role' => 'user',
+                    'content' => $combined_content
+                ];
+            }
+
             $body = [
                 'bot_id' => $app_id,
                 'user_id' => strval($user_id),
                 'stream' => true,
                 'auto_save_history' => true,
-                'additional_messages' => [
-                    [
-                        'role' => 'user',
-                        'content' => $message,
-                        'content_type' => 'text'
-                    ]
-                ]
+                'additional_messages' => $additional_messages
+
             ];
             if ($session_id) {
                 $body['conversation_id'] = $session_id;
@@ -208,10 +223,10 @@ function deepseek_send_agent_message(WP_REST_Request $request) {
             echo "data: " . json_encode(['error' => '未知的智能体提供商'], JSON_UNESCAPED_UNICODE) . "\n\n";
             flush();
             exit;
-    }
+        }
 
-    // 定义统一的响应处理函数
-    $write_function = function ($ch, $data) use (&$full_response, &$current_session_id, $provider) {
+        // 定义统一的响应处理函数
+        $write_function = function ($ch, $data) use (&$full_response, &$current_session_id, $provider, $app_id, $user_id, $access_token) {
         $original_data = $data;
         $data = mb_convert_encoding($data, 'UTF-8', 'UTF-8');
         error_log("Raw response data: " . $data);
@@ -222,7 +237,6 @@ function deepseek_send_agent_message(WP_REST_Request $request) {
         foreach ($lines as $line) {
             $line = trim($line);
 
-            // 处理Coze的event前缀
             if ($provider === 'coze' && strpos($line, 'event:') === 0) {
                 $event = trim(substr($line, 6));
                 continue;
@@ -278,6 +292,7 @@ function deepseek_send_agent_message(WP_REST_Request $request) {
                         break;
 
                     case 'coze':
+                        // 处理普通消息
                         if (isset($event) && $event === 'conversation.message.delta' && 
                             isset($json_data['content']) && 
                             isset($json_data['role']) && $json_data['role'] === 'assistant' && 
@@ -285,6 +300,17 @@ function deepseek_send_agent_message(WP_REST_Request $request) {
                             $full_response .= $json_data['content'];
                             echo "data: " . json_encode(['text' => $json_data['content']], JSON_UNESCAPED_UNICODE) . "\n\n";
                             $should_flush = true;
+                        }
+                        // 处理function_call
+                        elseif (isset($event) && $event === 'conversation.chat.tool_call.invoke' && 
+                                isset($json_data['tool_calls']) && !empty($json_data['tool_calls'])) {
+                            $tool_call = $json_data['tool_calls'][0];
+                            $tool_call_id = $tool_call['id'];
+                            $function_name = $tool_call['function']['name'];
+                            $arguments = json_decode($tool_call['function']['arguments'], true);
+
+                            $tool_output = "文件已处理"; // 插件处理结果
+                            submit_tool_output($app_id, $user_id, $access_token, $tool_call_id, $tool_output);
                         }
                         if (isset($json_data['conversation_id'])) {
                             $current_session_id = $json_data['conversation_id'];
@@ -351,6 +377,39 @@ function deepseek_send_agent_message(WP_REST_Request $request) {
     exit;
 }
 
+    // 提交工具执行结果给Coze API
+    function submit_tool_output($bot_id, $user_id, $access_token, $tool_call_id, $output) {
+    $url = "https://api.coze.cn/v3/chat/submit_tool_outputs";
+    $headers = [
+        "Authorization: Bearer $access_token",
+        "Content-Type: application/json; charset=UTF-8"
+    ];
+    $body = [
+        'bot_id' => $bot_id,
+        'user_id' => strval($user_id),
+        'stream' => true,
+        'tool_outputs' => [
+            [
+                'tool_call_id' => $tool_call_id,
+                'output' => $output
+            ]
+        ]
+    ];
+    $body = json_encode($body, JSON_UNESCAPED_UNICODE);
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+
+    $response = curl_exec($ch);
+    error_log("Tool output submission response: " . $response);
+    curl_close($ch);
+}
+
 // 智能体设置页面
 function deepseek_render_agents_page() {
     $saved = isset($_GET['settings-updated']) && $_GET['settings-updated'] === 'true';
@@ -382,7 +441,6 @@ function deepseek_render_agents_page() {
         }
         .dashscope-wrap th, .dashscope-wrap td {
             padding: 10px;
-            width: 150px;
             border: 1px solid #ddd;
             text-align: left;
         }
@@ -430,7 +488,18 @@ function deepseek_render_agents_page() {
                 <?php
                 do_settings_sections('deepseek-agents');
                 ?>
-                <p>支持阿里、腾讯、火山引擎和扣子平台的智能体应用。阿里API Key就是百炼里面的，腾讯需为每个智能体单独设置Token，火山引擎和模型apikey一样，扣子的个人访问令牌Token需定期更换。</p>
+                <p>
+                    <strong>支持的文件格式</strong>
+                    <input type="text" id="agent_file_formats" name="agent_file_formats" value="<?php echo esc_attr(get_option('agent_file_formats', 'pdf')); ?>" style="width: 500px;" />
+                    <p class="description">多种用英文逗号分隔，例如：pdf,docx,txt</p>
+                </p>
+                <p>
+                    <strong>最大文件大小（MB）</strong>
+                    <input type="number" id="agent_file_max_size" name="agent_file_max_size" value="<?php echo esc_attr(get_option('agent_file_max_size', 10)); ?>" min="1" style="width: 100px;" />
+                    <p class="description">设置支持上传的最大文件大小，单位为MB</p>
+                </p>
+
+                <p>支持阿里、腾讯、火山引擎和扣子平台的智能体应用。阿里API Key就是百炼里面的，腾讯需为每个智能体单独设置Token，火山引擎和模型apikey一样，扣子的个人访问令牌Token需定期更换，文件上传只支持扣子应用。</p>
             </div>
 
             <div class="dashscope-section">
@@ -441,7 +510,7 @@ function deepseek_render_agents_page() {
             <?php submit_button('保存设置'); ?>
         </form>
         <div class="success-message" <?php echo $saved ? 'style="display: block;"' : ''; ?>>设置已保存</div>
-        <p>暂时只支持普通对话，不支持使用了插件的智能体应用，(支持联网搜索插件)。</p>
+        <p>只支持普通对话，只支持联网搜索插件，其他插件可能有最终结果，但是不一定显示过程，文件上传只支持扣子应用。</p>
     </div>
 
     <?php if ($saved) : ?>
@@ -528,39 +597,47 @@ function deepseek_render_agent_logs_page() {
             </div>
         </div>
     </div>
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('.delete-agent-log').forEach(button => {
-            button.addEventListener('click', function(e) {
-                e.preventDefault();
-                if (!confirm('确定要删除此对话记录吗？')) return;
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.delete-agent-log').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (!confirm('确定要删除此对话记录吗？')) return;
 
-                const row = this.closest('tr');
-                const userId = row.getAttribute('data-user-id');
-                const appId = row.getAttribute('data-app-id');
+            const row = this.closest('tr');
+            const userId = row.getAttribute('data-user-id');
+            const appId = row.getAttribute('data-app-id');
 
-                fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
-                    method: 'POST',
-                    headers: { 'Content-Type: 'application/x-www-form-urlencoded' },
-                    body: 'action=deepseek_delete_agent_log&user_id=' + encodeURIComponent(userId) + '&app_id=' + encodeURIComponent(appId)
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) { 
-                        row.remove(); 
-                        alert('记录已删除'); 
-                    } else { 
-                        alert('删除失败: ' + (data.message || '未知错误')); 
-                    }
-                })
-                .catch(error => {
-                    console.error('删除请求失败:', error);
-                    alert('删除请求失败，请稍后重试');
-                });
+            // 添加nonce以提高安全性
+            const data = new URLSearchParams({
+                action: 'deepseek_delete_agent_log',
+                user_id: userId,
+                app_id: appId,
+                nonce: '<?php echo wp_create_nonce('delete_agent_log_nonce'); ?>'
+            });
+
+            fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: data
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    row.remove();
+                    alert('记录已删除');
+                } else {
+                    alert('删除失败: ' + (data.data?.message || '未知错误'));
+                }
+            })
+            .catch(error => {
+                console.error('删除请求失败:', error);
+                alert('删除请求失败，请稍后重试');
             });
         });
     });
-    </script>
+});
+</script>
     <?php
 }
 
@@ -571,12 +648,13 @@ function deepseek_register_agents_settings() {
     register_setting('deepseek_agents_group', 'coze_access_token_expiry', 'deepseek_sanitize_expiry');
     register_setting('deepseek_agents_group', 'deepseek_agents', 'deepseek_sanitize_agents');
     register_setting('deepseek_agents_group', 'volc_agent_api_key', 'sanitize_text_field');
+    register_setting('deepseek_agents_group', 'agent_file_formats', 'sanitize_text_field');
+    register_setting('deepseek_agents_group', 'agent_file_max_size', 'intval');
 
     add_settings_section('deepseek_agents_section', '', null, 'deepseek-agents');
     add_settings_field('ali_agent_api_key', '阿里智能体API KEY', 'ali_agent_api_key_callback', 'deepseek-agents', 'deepseek_agents_section');
     add_settings_field('volc_agent_api_key', '火山引擎API Key', 'volc_agent_api_key_callback', 'deepseek-agents', 'deepseek_agents_section');
     add_settings_field('coze_access_token', '扣子访问令牌Token', 'coze_access_token_callback', 'deepseek-agents', 'deepseek_agents_section');
-    
 }
 add_action('admin_init', 'deepseek_register_agents_settings');
 
@@ -625,7 +703,8 @@ function deepseek_agents_list_callback() {
                 <th>图标URL</th>
                 <th>应用ID</th>
                 <th>腾讯Token</th>
-                <th>开场问题</th>
+                <th>开场问题(一行一个)</th>
+                <th>文件上传</th>
                 <th>操作</th>
             </tr>
         </thead>
@@ -655,7 +734,9 @@ function deepseek_agents_list_callback() {
                         <textarea name="deepseek_agents[<?php echo $index; ?>][opening_questions]" rows="3" cols="30"><?php 
                             echo esc_textarea(implode("\n", $agent['opening_questions'] ?? [])); 
                         ?></textarea>
-                        <p class="description">每行一个开场问题，用换行分隔。</p>
+                    </td>
+                    <td>
+                        <input type="checkbox" name="deepseek_agents[<?php echo $index; ?>][enable_file_upload]" value="1" <?php checked($agent['enable_file_upload'] ?? 0, 1); ?> />
                     </td>
                     <td><button type="button" class="button delete-agent">删除</button></td>
                 </tr>
@@ -684,8 +765,8 @@ function deepseek_agents_list_callback() {
                 <td><span>-</span></td>
                 <td>
                     <textarea name="deepseek_agents[${rowCount}][opening_questions]" rows="3" cols="30"></textarea>
-                    <p class="description">每行一个开场问题，用换行分隔。</p>
                 </td>
+                <td><input type="checkbox" name="deepseek_agents[${rowCount}][enable_file_upload]" value="1" /></td>
                 <td><button type="button" class="button delete-agent">删除</button></td>
             `;
         });
@@ -727,6 +808,7 @@ function deepseek_sanitize_agents($input) {
                     'icon' => esc_url_raw($agent['icon']),
                     'app_id' => sanitize_text_field($agent['app_id']),
                     'opening_questions' => array_map('sanitize_text_field', $opening_questions),
+                    'enable_file_upload' => isset($agent['enable_file_upload']) && $agent['enable_file_upload'] == '1' ? 1 : 0,
                 ];
                 
                 if ($agent['provider'] === 'tencent' && !empty($agent['token'])) {
@@ -762,19 +844,37 @@ function deepseek_sanitize_expiry($input) {
 function deepseek_delete_agent_log() {
     global $wpdb;
     $table_name = $wpdb->prefix . 'deepseek_agent_chat_logs';
-    $user_id = intval($_POST['user_id']);
-    $app_id = sanitize_text_field($_POST['app_id']);
-
-    if (!current_user_can('manage_options')) {
-        wp_send_json(['success' => false, 'message' => '无权删除记录']);
+    
+    // 检查是否通过POST传递了必要参数
+    if (!isset($_POST['user_id']) || !isset($_POST['app_id'])) {
+        wp_send_json_error(['message' => '缺少必要参数']);
         return;
     }
 
-    $wpdb->delete($table_name, ['user_id' => $user_id, 'app_id' => $app_id]);
+    $user_id = intval($_POST['user_id']);
+    $app_id = sanitize_text_field($_POST['app_id']);
+
+    // 验证管理员权限
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(['message' => '无权删除记录']);
+        return;
+    }
+
+    // 执行删除操作
+    $deleted = $wpdb->delete(
+        $table_name,
+        ['user_id' => $user_id, 'app_id' => $app_id],
+        ['%d', '%s']
+    );
+
+    // 检查删除结果
     if ($wpdb->last_error) {
-        wp_send_json(['success' => false, 'message' => '删除失败: ' . $wpdb->last_error]);
+        error_log("删除对话记录失败: " . $wpdb->last_error);
+        wp_send_json_error(['message' => '删除失败: ' . $wpdb->last_error]);
+    } elseif ($deleted === 0) {
+        wp_send_json_error(['message' => '没有找到匹配的记录']);
     } else {
-        wp_send_json(['success' => true]);
+        wp_send_json_success(['message' => '记录已删除']);
     }
 }
 add_action('wp_ajax_deepseek_delete_agent_log', 'deepseek_delete_agent_log');
@@ -812,6 +912,55 @@ function deepseek_clear_agent_conversation() {
     }
 }
 add_action('wp_ajax_deepseek_clear_agent_conversation', 'deepseek_clear_agent_conversation');
+
+// 处理智能体文件上传
+add_action('wp_ajax_deepseek_upload_agent_file', 'deepseek_upload_agent_file');
+function deepseek_upload_agent_file() {
+    check_ajax_referer('agent_file_upload_action', 'nonce');
+
+    if (!isset($_FILES['file']) || $_FILES['file']['error'] == UPLOAD_ERR_NO_FILE) {
+        wp_send_json_error(['message' => '未选择文件']);
+    }
+
+    $file = $_FILES['file'];
+    $allowed_types = explode(',', get_option('agent_file_formats', 'pdf')); // 支持的文件格式
+    $max_size = intval(get_option('agent_file_max_size', 10)) * 1024 * 1024; // 最大文件大小（MB转换为字节）
+
+    $file_type = pathinfo($file['name'], PATHINFO_EXTENSION);
+    if (!in_array(strtolower($file_type), array_map('strtolower', $allowed_types))) {
+        wp_send_json_error(['message' => '不支持的文件格式', 'allowed_types' => implode(', ', $allowed_types)]);
+    }
+
+    if ($file['size'] > $max_size) {
+        wp_send_json_error(['message' => '文件大小超过限制 (' . ($max_size / 1024 / 1024) . 'MB)']);
+    }
+
+    $upload_overrides = array('test_form' => false);
+    $uploaded_file = wp_handle_upload($file, $upload_overrides);
+
+    if (isset($uploaded_file['error'])) {
+        wp_send_json_error(['message' => '文件上传失败: ' . $uploaded_file['error']]);
+    }
+
+    $attachment = array(
+        'guid' => $uploaded_file['url'],
+        'post_mime_type' => $uploaded_file['type'],
+        'post_title' => sanitize_file_name($file['name']),
+        'post_content' => '',
+        'post_status' => 'inherit'
+    );
+
+    $attachment_id = wp_insert_attachment($attachment, $uploaded_file['file']);
+    if (is_wp_error($attachment_id)) {
+        wp_send_json_error(['message' => '保存文件到媒体库失败']);
+    }
+
+    wp_send_json_success([
+        'file_url' => $uploaded_file['url'],
+        'file_name' => $file['name'],
+        'suffix_type' => $file_type
+    ]);
+}
 
 // 插件卸载清理
 function deepseek_cleanup_options() {

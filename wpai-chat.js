@@ -1,6 +1,25 @@
 // 将Markdown文本转换为HTML
 function convertMarkdownToHTML(markdownText) {
-    return marked.parse(markdownText);
+    // 配置marked解析器
+    marked.setOptions({
+        breaks: true, // 支持换行
+        gfm: true,   // 支持GitHub风格的Markdown
+    });
+
+    // 自定义渲染器
+    const renderer = new marked.Renderer();
+    const originalLink = renderer.link; // 保存原始link渲染方法
+
+    // 重写链接渲染逻辑，确保链接后有分隔
+    renderer.link = function(href, title, text) {
+        // 调用原始link方法生成基本的<a>标签
+        const linkHtml = originalLink.call(this, href, title, text);
+        // 添加 target="_blank" 并确保后面有分隔符
+        return `${linkHtml.replace('<a', '<a target="_blank"')} `;
+    };
+
+    // 解析Markdown并返回HTML
+    return marked.parse(markdownText, { renderer });
 }
 
 // 通过DEEPSEEK_VARS对象访问变量
@@ -18,13 +37,14 @@ var currentAppId = null;
 var showingAgents = false;
 var currentPage = 'home';
 let uploadedFiles = [];
+let agentUploadedFile = null;
 
 // 设置当前页面状态
 function setCurrentPage(page) {
     currentPage = page;
     localStorage.setItem('currentPage', page);
     toggleClearButtonVisibility();
-    toggleOptionsVisibility(); // 更新选项栏显示
+    toggleOptionsVisibility();
 }
 
 // 设置普通对话 ID
@@ -72,6 +92,12 @@ window.addEventListener('load', function() {
 
     currentPage = storedPage;
 
+    // 默认隐藏智能体文件上传区域
+    const agentUploadSection = document.querySelector('.agent-upload-section');
+    if (agentUploadSection) {
+        agentUploadSection.style.display = 'none'; // 初始隐藏
+    }
+
     if (storedPage === 'conversation' && storedConversationId) {
         setCurrentConversationId(storedConversationId);
         loadChatLog(storedConversationId);
@@ -84,16 +110,18 @@ window.addEventListener('load', function() {
         loadAgentList();
     }
 
+    // 联网搜索
     var enableSearchSwitch = document.getElementById('enable-search');
     if (enableSearchSwitch) {
         var storedSearchState = localStorage.getItem('enableSearchState');
         enableSearchSwitch.checked = storedSearchState === 'true';
     }
 
-    // 初始化模型选择框
+    // 状态栏、模型参数、智能体文件
     updateModelSelectOptions();
-    // 初始化选项栏显示
+    toggleClearButtonVisibility();
     toggleOptionsVisibility();
+    initAgentFileUpload();
 });
 
 // 默认提示
@@ -294,7 +322,7 @@ function updateModelSelectOptions() {
     });
 }
 
-// 文件上传处理
+// 普通对话框文件上传处理
 document.addEventListener('DOMContentLoaded', function() {
     const uploadBtn = document.getElementById('deepseek-upload-file-btn');
     const fileInput = document.getElementById('deepseek-file-input');
@@ -357,7 +385,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// 更新已上传文件列表
+// 普通对话框已上传文件列表
 function updateUploadedFilesList() {
     const filesList = document.getElementById('uploaded-files-list');
     filesList.innerHTML = '';
@@ -1096,7 +1124,7 @@ function showCustomNotification(message, type = 'error') {
     }, 2000);
 }
 
-// 清除对话
+// 清除智能体应用对话
 function clearConversation(container) {
     const appId = currentAppId;
     if (!appId) {
@@ -1139,11 +1167,13 @@ function loadAgentChat(appId) {
     messagesContainer.innerHTML = '';
 
     Promise.all([
-        fetch(adminAjaxUrl + '?action=deepseek_load_agent_log&app_id=' + appId).then(response => response.json()),
-        fetch(adminAjaxUrl + '?action=deepseek_get_agents').then(response => response.json())
+        fetch(DEEPSEEK_VARS.ADMIN_AJAX_URL + '?action=deepseek_load_agent_log&app_id=' + appId).then(response => response.json()),
+        fetch(DEEPSEEK_VARS.ADMIN_AJAX_URL + '?action=deepseek_get_agents').then(response => response.json())
     ])
     .then(([chatData, agentData]) => {
         let agent = null;
+        const agentUploadSection = document.querySelector('.agent-upload-section');
+
         if (agentData.success && agentData.data && agentData.data.agents) {
             agent = agentData.data.agents.find(a => a.app_id === appId);
             if (agent) {
@@ -1154,13 +1184,21 @@ function loadAgentChat(appId) {
                     <span class="agent-name">${agent.name}</span>
                 `;
                 messagesContainer.appendChild(headerContainer);
+
+                // 根据enable_file_upload动态控制agent-upload-section显示
+                if (agentUploadSection) {
+                    agentUploadSection.style.display = agent.enable_file_upload ? 'flex' : 'none';
+                }
             } else {
                 messagesContainer.innerHTML += '<div class="message-bubble bot">未找到该智能体详情</div>';
+                if (agentUploadSection) agentUploadSection.style.display = 'none';
             }
         } else {
             messagesContainer.innerHTML += '<div class="message-bubble bot">加载智能体详情失败，请检查配置</div>';
+            if (agentUploadSection) agentUploadSection.style.display = 'none';
         }
 
+        // 加载对话历史
         if (chatData.success && chatData.data && chatData.data.messages && Array.isArray(chatData.data.messages)) {
             if (chatData.data.messages.length > 0) {
                 chatData.data.messages.forEach(message => {
@@ -1207,10 +1245,14 @@ function loadAgentChat(appId) {
         localStorage.setItem('showingAgents', 'false');
         setCurrentPage('agent');
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+        toggleOptionsVisibility();
     })
     .catch(error => {
         console.error('加载智能体对话或详情失败:', error);
         messagesContainer.innerHTML = '<div class="message-bubble bot">网络错误，请稍后重试</div>';
+        const agentUploadSection = document.querySelector('.agent-upload-section');
+        if (agentUploadSection) agentUploadSection.style.display = 'none';
     });
 }
 
@@ -1219,7 +1261,7 @@ function sendAgentMessage(message, appId) {
     var messagesContainer = document.getElementById('deepseek-chat-messages');
     
     if (!messagesContainer.querySelector('.agent-header')) {
-        fetch(adminAjaxUrl + '?action=deepseek_get_agents')
+        fetch(DEEPSEEK_VARS.ADMIN_AJAX_URL + '?action=deepseek_get_agents')
         .then(response => response.json())
         .then(agentData => {
             if (agentData.success && agentData.data && agentData.data.agents) {
@@ -1232,31 +1274,51 @@ function sendAgentMessage(message, appId) {
                         <span class="agent-name">${agent.name}</span>
                     `;
                     messagesContainer.insertBefore(headerContainer, messagesContainer.firstChild);
-                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+                    // 根据enable_file_upload动态控制agent-upload-section显示
+                    const agentUploadSection = document.querySelector('.agent-upload-section');
+                    if (agentUploadSection) {
+                        agentUploadSection.style.display = agent.enable_file_upload ? 'flex' : 'none';
+                    }
                 }
             }
         });
     }
 
-    messagesContainer.innerHTML += '<div class="message-bubble user">' + message + '</div>';
+    // 显示用户消息
+    if (message || agentUploadedFile) {
+        var userMessageContainer = document.createElement('div');
+        userMessageContainer.classList.add('message-bubble', 'user');
+        var combinedContent = '';
+        if (agentUploadedFile) {
+            combinedContent += `<a href="${agentUploadedFile.file_url}" target="_blank">${agentUploadedFile.file_name}</a>`;
+        }
+        if (message) {
+            combinedContent += (combinedContent ? ' ' : '') + message;
+        }
+        userMessageContainer.innerHTML = combinedContent;
+        messagesContainer.appendChild(userMessageContainer);
+    }
+
+    // 发送消息
     var botMessageContainer = document.createElement('div');
     botMessageContainer.classList.add('message-bubble', 'bot');
     botMessageContainer.textContent = '智能体应用正在处理...';
     messagesContainer.appendChild(botMessageContainer);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-    const agentUrl = restUrl.replace('send-message', 'send-agent-message');
-
+    const agentUrl = DEEPSEEK_VARS.REST_URL.replace('send-message', 'send-agent-message');
     fetch(agentUrl, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-WP-Nonce': deepseek_rest_nonce
+            'X-WP-Nonce': DEEPSEEK_VARS.REST_NONCE
         },
         body: JSON.stringify({
             message: message,
             app_id: appId,
-            session_id: localStorage.getItem('currentSessionId') || null
+            session_id: localStorage.getItem('currentSessionId') || null,
+            file_data: agentUploadedFile
         })
     })
     .then(response => {
@@ -1266,7 +1328,6 @@ function sendAgentMessage(message, appId) {
     .then(reader => {
         const decoder = new TextDecoder();
         let botReply = '';
-
         function processStream() {
             reader.read().then(({ done, value }) => {
                 if (done) {
@@ -1275,6 +1336,11 @@ function sendAgentMessage(message, appId) {
                     addVoicePlayback(botMessageContainer, botReply);
                     messagesContainer.scrollTop = messagesContainer.scrollHeight;
                     document.getElementById('deepseek-chat-input').value = '';
+                    const fileDisplay = document.getElementById('agent-uploaded-file');
+                    const fileNameSpan = fileDisplay.querySelector('.file-name');
+                    agentUploadedFile = null;
+                    fileNameSpan.textContent = '';
+                    fileDisplay.classList.remove('visible');
                     return;
                 }
                 const chunk = decoder.decode(value, { stream: true });
@@ -1288,14 +1354,11 @@ function sendAgentMessage(message, appId) {
                             const jsonData = JSON.parse(dataPart);
                             if (jsonData.error) {
                                 botMessageContainer.textContent = '错误: ' + jsonData.error;
-                                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                                return;
-                            }
-                            if (jsonData.text) {
+                            } else if (jsonData.text) {
                                 botReply += jsonData.text;
                                 botMessageContainer.innerHTML = convertMarkdownToHTML(botReply);
-                                botMessageContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
                             }
+                            messagesContainer.scrollTop = messagesContainer.scrollHeight;
                         } catch (e) {
                             console.error('解析 SSE 数据错误:', e, '原始数据:', dataPart);
                         }
@@ -1313,6 +1376,66 @@ function sendAgentMessage(message, appId) {
     });
 }
 
+// 智能体文件上传
+function initAgentFileUpload() {
+    const uploadBtn = document.getElementById('deepseek-agent-upload-btn');
+    const fileInput = document.getElementById('deepseek-agent-file-input');
+    const fileDisplay = document.getElementById('agent-uploaded-file');
+    const fileNameSpan = fileDisplay.querySelector('.file-name');
+    const removeBtn = fileDisplay.querySelector('.remove-file-btn');
+
+    if (uploadBtn && fileInput) {
+        uploadBtn.addEventListener('click', function() {
+            console.log('Upload button clicked');
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', function() {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('action', 'deepseek_upload_agent_file');
+            formData.append('file', file);
+            formData.append('nonce', DEEPSEEK_VARS.AGENT_FILE_UPLOAD_NONCE);
+
+            fetch(DEEPSEEK_VARS.ADMIN_AJAX_URL, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    agentUploadedFile = {
+                        file_url: data.data.file_url,
+                        file_name: data.data.file_name,
+                        suffix_type: data.data.suffix_type
+                    };
+                    fileNameSpan.textContent = `已上传: ${data.data.file_name}`;
+                    fileDisplay.classList.add('visible');
+                    console.log('File uploaded, visible class added:', fileDisplay.classList);
+                } else {
+                    showCustomNotification(data.data.message || '文件上传失败', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('智能体文件上传错误:', error);
+                showCustomNotification('文件上传错误: 网络问题', 'error');
+            });
+
+            fileInput.value = '';
+        });
+
+        removeBtn.addEventListener('click', function() {
+            console.log('Remove button clicked');
+            agentUploadedFile = null;
+            fileNameSpan.textContent = '';
+            fileDisplay.classList.remove('visible');
+            console.log('Visible class removed:', fileDisplay.classList);
+        });
+    }
+}
+
 // 控制清除对话按钮的显示
 function toggleClearButtonVisibility() {
     const clearButton = document.getElementById('clear-conversation-button');
@@ -1321,26 +1444,23 @@ function toggleClearButtonVisibility() {
     }
 }
 
-// 在页面加载时初始化按钮显示
-window.addEventListener('load', function() {
-    toggleClearButtonVisibility();
-});
-
 // 控制选项栏特定板块的显示
 function toggleOptionsVisibility() {
     const interfaceSelect = document.querySelector('.deepseek-interface-select');
     const searchToggle = document.querySelector('.deepseek-search-toggle');
     const uploadSection = document.querySelector('.upload-section');
+    const agentUploadSection = document.querySelector('.agent-upload-section');
 
-    // 如果当前是智能体页面，保持隐藏
+    // 当前是智能体页面
     if (currentPage === 'agent') {
         if (interfaceSelect) interfaceSelect.style.display = 'none';
         if (searchToggle) searchToggle.style.display = 'none';
         if (uploadSection) uploadSection.style.display = 'none';
     } else {
-        // 非智能体页面，恢复显示
+        // 非智能体页面
         if (interfaceSelect) interfaceSelect.style.display = '';
         if (searchToggle) searchToggle.style.display = '';
         if (uploadSection) uploadSection.style.display = '';
+        if (agentUploadSection) agentUploadSection.style.display = 'none';
     }
 }

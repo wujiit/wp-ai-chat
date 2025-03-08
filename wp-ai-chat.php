@@ -1,9 +1,9 @@
 <?php
 /*
 Plugin Name: 小半WordPress ai助手
-Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型。
+Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型以及智能体应用。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 4.0
+Version: 4.0.1
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -474,7 +474,7 @@ function chat_interfaces_callback() {
         'qianfan' => '千帆(文心一言)',
         'hunyuan' => '腾讯混元',
         'xunfei' => '讯飞星火',
-        'pollinations' => 'Pollinations (文生图)',
+        'pollinations' => 'Pollinations(文生图)',
         'custom' => '自定义接口'
     );
     ?>
@@ -505,7 +505,7 @@ function default_chat_interface_callback() {
         'qianfan' => '千帆(文心一言)',
         'hunyuan' => '腾讯混元',
         'xunfei' => '讯飞星火',
-        'pollinations' => 'Pollinations (文生图)',
+        'pollinations' => 'Pollinations(文生图)',
         'custom' => '自定义接口'
     );
     ?>
@@ -1090,7 +1090,8 @@ function deepseek_enqueue_assets() {
                     'ADMIN_AJAX_URL' => admin_url('admin-ajax.php'),
                     'ENABLE_KEYWORD_DETECTION' => get_option('enable_keyword_detection', '0'),
                     'KEYWORDS' => get_option('keyword_list', ''),
-                    'FILE_UPLOAD_NONCE' => wp_create_nonce('file_upload_action')
+                    'FILE_UPLOAD_NONCE' => wp_create_nonce('file_upload_action'),
+                    'AGENT_FILE_UPLOAD_NONCE' => wp_create_nonce('agent_file_upload_action')
                 )
             );
         }
@@ -1438,7 +1439,17 @@ function deepseek_chat_shortcode() {
                         <input type="file" id="deepseek-file-input" multiple style="display: none;" />
                         <div id="uploaded-files-list"></div>
                     </div>
-                <?php endif; ?>             
+                <?php endif; ?> 
+
+                <!-- 智能体文件上传板块 -->
+                <div class="agent-upload-section" style="display: none;">
+                    <button id="deepseek-agent-upload-btn">本地文件</button>
+                    <input type="file" id="deepseek-agent-file-input" style="display: none;" />
+                    <div id="agent-uploaded-file">
+                        <span class="file-name"></span>
+                        <button class="remove-file-btn">删除</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -2131,7 +2142,7 @@ function deepseek_load_log() {
         $response = json_decode($log->response, true);
         
         if ($response && isset($response['image_url'])) {
-            // 使用 message 作为默认提示词，如果 actual_prompt 不存在
+            // 使用message作为默认提示词，如果actual_prompt不存在
             $actual_prompt = isset($response['actual_prompt']) ? esc_html($response['actual_prompt']) : esc_html($log->message);
             $html = '<div class="image-prompt">' . $actual_prompt . '</div>';
             $html .= '<img src="' . esc_url($response['image_url']) . '" style="max-width:100%;height:auto;" />';
@@ -2174,17 +2185,29 @@ function deepseek_delete_log() {
     $conversation_id = intval($_POST['conversation_id']);
     $user_id = get_current_user_id();
 
-    // 检查权限
-    $log = $wpdb->get_row($wpdb->prepare(
-        "SELECT * FROM $table_name WHERE conversation_id = %d AND user_id = %d LIMIT 1",
+    // 检查是否为管理员
+    if (!current_user_can('manage_options') && !$wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(*) FROM $table_name WHERE conversation_id = %d AND user_id = %d",
         $conversation_id, $user_id
-    ));
+    ))) {
+        wp_send_json(['success' => false, 'message' => '无权删除此记录']);
+        return;
+    }
 
-    if ($log || current_user_can('manage_options')) {
-        $wpdb->delete($table_name, array('conversation_id' => $conversation_id));
-        wp_send_json(array('success' => true));
+    // 删除所有与该conversation_id相关的记录
+    $deleted = $wpdb->delete(
+        $table_name,
+        ['conversation_id' => $conversation_id],
+        ['%d']
+    );
+
+    if ($deleted === false) {
+        error_log("删除对话记录失败: " . $wpdb->last_error);
+        wp_send_json(['success' => false, 'message' => '删除失败: 数据库错误']);
+    } elseif ($deleted === 0) {
+        wp_send_json(['success' => false, 'message' => '未找到可删除的记录']);
     } else {
-        wp_send_json(array('success' => false, 'message' => '无权删除此记录。'));
+        wp_send_json(['success' => true, 'message' => '对话记录已删除']);
     }
 }
 add_action('wp_ajax_deepseek_delete_log', 'deepseek_delete_log');
@@ -2195,19 +2218,19 @@ function deepseek_render_logs_page() {
     $table_name = $wpdb->prefix . 'deepseek_chat_logs';
 
     // 删除记录
-    if (isset($_GET['delete_log']) && current_user_can('manage_options')) {
-        $log_id = intval($_GET['delete_log']);
-        $wpdb->delete($table_name, array('id' => $log_id));
-        echo '<div class="notice notice-success"><p>记录已删除。</p></div>';
+    if (isset($_GET['delete_conversation']) && current_user_can('manage_options')) {
+        $conversation_id = intval($_GET['delete_conversation']);
+        $wpdb->delete($table_name, ['conversation_id' => $conversation_id], ['%d']);
+        echo '<div class="notice notice-success"><p>对话记录已删除。</p></div>';
     }
 
     // 分页处理
-    $per_page = 20; // 每页显示的记录数
+    $per_page = 20;
     $current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
     $offset = ($current_page - 1) * $per_page;
 
     // 获取总记录数
-    $total_logs = $wpdb->get_var("SELECT COUNT(*) FROM $table_name");
+    $total_logs = $wpdb->get_var("SELECT COUNT(DISTINCT conversation_id) FROM $table_name");
 
     // 获取当前页的记录
     $logs = $wpdb->get_results($wpdb->prepare(
@@ -2231,11 +2254,13 @@ function deepseek_render_logs_page() {
                 <?php if (!empty($logs)) : ?>
                     <?php foreach ($logs as $log) : ?>
                         <tr>
-                            <td><?php echo $log->user_id; ?></td>
+                            <td><?php echo esc_html($log->user_id); ?></td>
                             <td><?php echo esc_html($log->conversation_title); ?></td>
-                            <td><?php echo $log->created_at; ?></td>
+                            <td><?php echo esc_html($log->created_at); ?></td>
                             <td>
-                                <a href="?page=deepseek-logs&delete_log=<?php echo $log->id; ?>" class="button">删除</a>
+                                <a href="?page=deepseek-logs&delete_conversation=<?php echo esc_attr($log->conversation_id); ?>" 
+                                   class="button" 
+                                   onclick="return confirm('确定要删除此对话记录吗？');">删除</a>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -2252,14 +2277,14 @@ function deepseek_render_logs_page() {
             <div class="tablenav-pages">
                 <?php
                 $total_pages = ceil($total_logs / $per_page);
-                echo paginate_links(array(
+                echo paginate_links([
                     'base' => add_query_arg('paged', '%#%'),
                     'format' => '',
-                    'prev_text' => __('&laquo; 上一页'),
-                    'next_text' => __('下一页 &raquo;'),
+                    'prev_text' => __('« 上一页'),
+                    'next_text' => __('下一页 »'),
                     'total' => $total_pages,
                     'current' => $current_page,
-                ));
+                ]);
                 ?>
             </div>
         </div>

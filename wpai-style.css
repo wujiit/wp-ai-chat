@@ -604,12 +604,12 @@ body {
     padding: 15px;
     display: flex;
     flex-wrap: wrap; /* 允许换行 */
-    gap: 10px;
+    gap: 15px;
     justify-content: flex-start;
 }
 
 .agent-item {
-    width: calc(20% - 8px); /* 一行5个，减去间距 */
+    width: calc(32%); /* 一行3个 */
     display: flex;
     align-items: center;
     background: linear-gradient(180deg, #ffffff, #f5f5f5);
@@ -1210,7 +1210,135 @@ body {
     }
 }
 
-/* 整体响应式优化 */
+/* 智能体文件上传板块整体样式 */
+.agent-upload-section {
+    display: none;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    margin: 10px 0;
+    padding: 4px 12px;
+    background: linear-gradient(90deg, #ffffff, #f9fbfd);
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.3s ease, transform 0.2s ease;
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+}
+
+.agent-upload-section:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+}
+
+/* 智能体文件上传按钮样式 */
+#deepseek-agent-upload-btn {
+    padding: 6px 12px;
+    background: linear-gradient(90deg, #4a90e2, #357abd);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    white-space: nowrap;
+    min-width: 80px;
+    line-height: 1; /* 确保行高不影响对齐 */
+}
+
+#deepseek-agent-upload-btn:hover {
+    background: linear-gradient(90deg, #357abd, #2a5d8c);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+#deepseek-agent-upload-btn:active {
+    transform: scale(0.98);
+}
+
+/* 智能体文件上传输入框 */
+#deepseek-agent-file-input {
+    display: none;
+}
+
+/* 已上传文件显示样式 */
+#agent-uploaded-file {
+    display: none;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    padding: 1px 12px;
+    background: #f0f0f0; /* 浅灰背景 */
+    border-radius: 4px;
+    max-width: 300px;
+}
+
+#agent-uploaded-file.visible {
+    display: flex; /* 上传后显示为flex布局 */
+}
+
+/* 文件名样式 */
+#agent-uploaded-file .file-name {
+    font-size: 13px;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis; /* 超出显示省略号 */
+    flex-grow: 1;
+}
+
+/* 删除按钮样式 */
+#agent-uploaded-file .remove-file-btn {
+    background: linear-gradient(90deg, #ff4d4d, #e60000);
+    color: #fff;
+    border: none;
+    padding: 2px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    transition: background 0.3s ease, transform 0.2s ease;
+    white-space: nowrap;
+}
+
+#agent-uploaded-file .remove-file-btn:hover {
+    background: linear-gradient(90deg, #e60000, #cc0000);
+    transform: translateY(-1px);
+}
+
+/* 智能体文件响应式 */
+@media (max-width: 768px) {
+    .agent-upload-section {
+        gap: 8px;
+        padding: 6px 10px;
+        margin-left: 10px;
+    }
+
+    #deepseek-agent-upload-btn {
+        padding: 6px 12px;
+        font-size: 12px;
+        min-width: 70px;
+    }
+
+    #agent-uploaded-file {
+        max-width: 200px;
+        padding: 1px 10px;
+    }
+
+    #agent-uploaded-file .file-name {
+        font-size: 12px;
+    }
+
+    #agent-uploaded-file .remove-file-btn {
+        padding: 2px 4px;
+        font-size: 10px;
+    }
+}
+
+
+/* 其他响应式优化 */
 @media (max-width: 768px) {
     .message-bubble.bot {
         max-width: 100%;
