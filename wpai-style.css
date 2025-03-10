@@ -505,6 +505,19 @@ body {
 }
 
 /* 联网搜索开关样式 */
+.deepseek-search-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 10px;
+    padding: 6px 12px;
+    background: linear-gradient(90deg, #ffffff, #f9fbfd);
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.3sease, transform 0.2sease;
+}
+
 .deepseek-search-toggle .switch {
     position: relative;
     display: inline-block;
@@ -1337,6 +1350,79 @@ body {
     }
 }
 
+/* 视频生成图片预览 */
+#qwen-video-image-preview {
+    display: flex;
+    align-items: center;
+    margin-left: 10px;
+}
+
+#uploaded-image-container img {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    max-width: 200px;
+    max-height: 200px;
+}
+
+#remove-uploaded-image {
+    background-color: #ff4444;
+    color: white;
+    border: none;
+    padding: 1px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#remove-uploaded-image:hover {
+    background-color: #cc0000;
+}
+
+/* 视频消息时调整宽度 */
+.message-bubble.bot.video-message {
+    width: 60%;
+    max-width: 80%;
+}
+
+.video-preview {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 公告样式 */
+#deepseek-announcement {
+    border-radius: 10px;
+    padding: 5px 20px;
+    margin: 15px auto;
+    max-width: 80%;
+    text-align: center;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    color: #181818;
+    font-size: 15px;
+    line-height: 1.6;
+    transition: transform 0.2s ease, box-shadow 0.3s ease;
+}
+
+#deepseek-announcement a {
+    color: #e68a00;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+#deepseek-announcement a:hover {
+    color: #cc7a00;
+    text-decoration: underline;
+}
+
+#deepseek-announcement p {
+    margin: 0;
+    padding: 0;
+}
+/* 公告样式end */ 
 
 /* 其他响应式优化 */
 @media (max-width: 768px) {
@@ -1441,5 +1527,21 @@ body {
 
     .tooltip {
         display: none;
-    }        
+    }
+
+    .message-bubble.bot.video-message {
+        width: 100%;
+    }
+
+    #uploaded-image-container img {
+        max-width: 100px;
+        max-height: 100px;
+    } 
+
+    #deepseek-announcement {
+        max-width: 98%;
+        padding: 10px 15px;
+        font-size: 14px;
+        margin: 10px auto;
+    }               
 }

@@ -510,7 +510,7 @@ function deepseek_render_agents_page() {
             <?php submit_button('保存设置'); ?>
         </form>
         <div class="success-message" <?php echo $saved ? 'style="display: block;"' : ''; ?>>设置已保存</div>
-        <p>只支持普通对话，只支持联网搜索插件，其他插件可能有最终结果，但是不一定显示过程，文件上传只支持扣子应用。</p>
+        <p>只支持普通对话，只支持联网搜索插件，文件上传只支持扣子应用。</p>
     </div>
 
     <?php if ($saved) : ?>
@@ -531,38 +531,65 @@ function deepseek_render_agent_logs_page() {
     global $wpdb;
     $table_name = $wpdb->prefix . 'deepseek_agent_chat_logs';
 
+    // 处理用户ID搜索
+    $search_user_id = isset($_GET['user_id']) ? intval($_GET['user_id']) : '';
+    $where_clause = $search_user_id ? $wpdb->prepare("WHERE cl.user_id = %d AND message != ''", $search_user_id) : "WHERE message != ''";
+
+    // 分页处理
     $per_page = 20;
     $current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
     $offset = ($current_page - 1) * $per_page;
 
-    $total_logs = $wpdb->get_var("SELECT COUNT(DISTINCT user_id, app_id) FROM $table_name WHERE message != ''");
+    // 获取总记录数
+    $total_logs = $wpdb->get_var("SELECT COUNT(DISTINCT cl.user_id, cl.app_id) FROM $table_name cl $where_clause");
 
+    // 获取当前页的记录，并关联用户信息
     $logs = $wpdb->get_results($wpdb->prepare(
-        "SELECT user_id, app_id, MIN(id) as first_id, message, created_at 
-         FROM $table_name 
-         WHERE message != '' 
-         GROUP BY user_id, app_id 
-         ORDER BY created_at DESC 
+        "SELECT cl.user_id, cl.app_id, MIN(cl.id) as first_id, cl.message, cl.created_at, u.user_login 
+         FROM $table_name cl 
+         LEFT JOIN {$wpdb->users} u ON cl.user_id = u.ID 
+         $where_clause 
+         GROUP BY cl.user_id, cl.app_id 
+         ORDER BY cl.created_at DESC 
          LIMIT %d OFFSET %d",
         $per_page, $offset
     ));
 
+    // 获取智能体名称映射
     $agents = get_option('deepseek_agents', []);
     $agent_map = [];
     foreach ($agents as $agent) {
         $agent_map[$agent['app_id']] = $agent['name'];
     }
+
     ?>
     <div class="wrap">
         <h1>智能体应用对话记录</h1>
+        
+        <!-- 用户ID搜索表单 -->
+        <form method="get" class="search-form" style="margin-bottom: 20px;">
+            <input type="hidden" name="page" value="deepseek-agent-logs">
+            <label for="user_id">按用户ID搜索: </label>
+            <input type="number" name="user_id" id="user_id" value="<?php echo esc_attr($search_user_id); ?>" min="1" style="width: 100px;">
+            <input type="submit" class="button" value="搜索">
+            <?php if ($search_user_id): ?>
+                <a href="?page=deepseek-agent-logs" class="button">显示所有记录</a>
+            <?php endif; ?>
+        </form>
+
+        <?php if ($search_user_id): ?>
+            <p>当前显示用户ID <?php echo esc_html($search_user_id); ?> 的智能体应用对话记录</p>
+        <?php endif; ?>
+
         <table class="wp-list-table widefat fixed striped">
             <thead>
                 <tr>
-                    <th>用户ID</th>
-                    <th>智能体应用</th>
-                    <th>首句消息</th>
-                    <th>时间</th>
-                    <th>操作</th>
+                    <th style="width: 80px;">用户ID</th>
+                    <th style="width: 150px;">用户名</th>
+                    <th style="width: 200px;">智能体应用</th>
+                    <th style="width: 300px;">首句消息</th>
+                    <th style="width: 160px;">时间</th>
+                    <th style="width: 100px;">操作</th>
                 </tr>
             </thead>
             <tbody>
@@ -570,6 +597,7 @@ function deepseek_render_agent_logs_page() {
                     <?php foreach ($logs as $log) : ?>
                         <tr data-user-id="<?php echo esc_attr($log->user_id); ?>" data-app-id="<?php echo esc_attr($log->app_id); ?>">
                             <td><?php echo esc_html($log->user_id); ?></td>
+                            <td><?php echo esc_html($log->user_login ? $log->user_login : '未知用户'); ?></td>
                             <td><?php echo esc_html(isset($agent_map[$log->app_id]) ? $agent_map[$log->app_id] : $log->app_id); ?></td>
                             <td><?php echo esc_html(mb_strimwidth($log->message, 0, 50, '...', 'UTF-8')); ?></td>
                             <td><?php echo esc_html($log->created_at); ?></td>
@@ -577,67 +605,74 @@ function deepseek_render_agent_logs_page() {
                         </tr>
                     <?php endforeach; ?>
                 <?php else : ?>
-                    <tr><td colspan="5">暂无记录。</td></tr>
+                    <tr><td colspan="6">暂无记录。</td></tr>
                 <?php endif; ?>
             </tbody>
         </table>
-        <div class="tablenav bottom">
-            <div class="tablenav-pages">
-                <?php
-                $total_pages = ceil($total_logs / $per_page);
-                echo paginate_links([
-                    'base' => add_query_arg('paged', '%#%'),
-                    'format' => '',
-                    'prev_text' => __('« 上一页'),
-                    'next_text' => __('下一页 »'),
-                    'total' => $total_pages,
-                    'current' => $current_page,
-                ]);
-                ?>
+
+        <!-- 分页导航 -->
+        <?php if ($total_logs > $per_page): ?>
+            <div class="tablenav bottom">
+                <div class="tablenav-pages">
+                    <?php
+                    $total_pages = ceil($total_logs / $per_page);
+                    $args = [
+                        'base' => add_query_arg('paged', '%#%'),
+                        'format' => '',
+                        'prev_text' => __('« 上一页'),
+                        'next_text' => __('下一页 »'),
+                        'total' => $total_pages,
+                        'current' => $current_page,
+                    ];
+                    if ($search_user_id) {
+                        $args['add_args'] = ['user_id' => $search_user_id];
+                    }
+                    echo paginate_links($args);
+                    ?>
+                </div>
             </div>
-        </div>
+        <?php endif; ?>
     </div>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.delete-agent-log').forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            if (!confirm('确定要删除此对话记录吗？')) return;
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.delete-agent-log').forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (!confirm('确定要删除此对话记录吗？')) return;
 
-            const row = this.closest('tr');
-            const userId = row.getAttribute('data-user-id');
-            const appId = row.getAttribute('data-app-id');
+                const row = this.closest('tr');
+                const userId = row.getAttribute('data-user-id');
+                const appId = row.getAttribute('data-app-id');
 
-            // 添加nonce以提高安全性
-            const data = new URLSearchParams({
-                action: 'deepseek_delete_agent_log',
-                user_id: userId,
-                app_id: appId,
-                nonce: '<?php echo wp_create_nonce('delete_agent_log_nonce'); ?>'
-            });
+                const data = new URLSearchParams({
+                    action: 'deepseek_delete_agent_log',
+                    user_id: userId,
+                    app_id: appId,
+                    nonce: '<?php echo wp_create_nonce('delete_agent_log_nonce'); ?>'
+                });
 
-            fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: data
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    row.remove();
-                    alert('记录已删除');
-                } else {
-                    alert('删除失败: ' + (data.data?.message || '未知错误'));
-                }
-            })
-            .catch(error => {
-                console.error('删除请求失败:', error);
-                alert('删除请求失败，请稍后重试');
+                fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: data
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        row.remove();
+                        alert('记录已删除');
+                    } else {
+                        alert('删除失败: ' + (data.data?.message || '未知错误'));
+                    }
+                })
+                .catch(error => {
+                    console.error('删除请求失败:', error);
+                    alert('删除请求失败，请稍后重试');
+                });
             });
         });
     });
-});
-</script>
+    </script>
     <?php
 }
 

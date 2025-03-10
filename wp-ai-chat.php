@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型以及智能体应用。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 4.0.1
+Version: 4.0.2
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -213,10 +213,11 @@ function deepseek_register_settings() {
     register_setting('deepseek_chat_options_group', 'claude_api_key');
     register_setting('deepseek_chat_options_group', 'claude_model', array('sanitize_callback' => 'sanitize_text_field'));
 
-    // 通义千问文本和图像
+    // 通义千问
     register_setting('deepseek_chat_options_group', 'qwen_api_key'); // 通义千问 API Key
-    register_setting('deepseek_chat_options_group', 'qwen_text_model', array('sanitize_callback' => 'sanitize_text_field')); // 通义千问 文本模型
-    register_setting('deepseek_chat_options_group', 'qwen_image_model', array('sanitize_callback' => 'sanitize_text_field')); // 通义千问 图像模型
+    register_setting('deepseek_chat_options_group', 'qwen_text_model', array('sanitize_callback' => 'sanitize_text_field')); // 文本模型
+    register_setting('deepseek_chat_options_group', 'qwen_image_model', array('sanitize_callback' => 'sanitize_text_field')); // 图像模型
+    register_setting('deepseek_chat_options_group', 'qwen_video_model', array('sanitize_callback' => 'sanitize_text_field')); // 视频模型
 
     // 自定义模型设置
     register_setting('deepseek_chat_options_group', 'custom_api_key');       // 自定义模型API Key
@@ -268,6 +269,9 @@ function deepseek_register_settings() {
     register_setting('deepseek_chat_options_group', 'deepseek_vip_prompt_page');
     register_setting('deepseek_chat_options_group', 'deepseek_vip_keyword');
 
+    // 底部公告设置
+    register_setting('deepseek_chat_options_group', 'deepseek_announcement', array('sanitize_callback' => 'wp_kses_post'));
+
     add_settings_section('deepseek_main_section', '基础设置', null, 'deepseek-chat');
 
     // 接口选择和默认接口设置
@@ -318,6 +322,7 @@ function deepseek_register_settings() {
     add_settings_field('qwen_api_key', '通义千问 API Key', 'qwen_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
     add_settings_field('qwen_text_model', '通义千问 文本模型参数', 'qwen_text_model_callback', 'deepseek-chat', 'deepseek_main_section');
     add_settings_field('qwen_image_model', '通义千问 图像模型参数', 'qwen_image_model_callback', 'deepseek-chat', 'deepseek_main_section');
+    add_settings_field('qwen_video_model', '通义千问 视频模型参数', 'qwen_video_model_callback', 'deepseek-chat', 'deepseek_main_section');
 
     // 自定义模型配置项
     add_settings_field('custom_api_key', '自定义模型 API Key', 'custom_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
@@ -393,12 +398,24 @@ function deepseek_register_settings() {
     add_settings_field('deepseek_vip_keyword', '会员验证关键词', 'deepseek_vip_keyword_callback', 'deepseek-chat', 'deepseek_main_section');
     add_settings_field('deepseek_vip_prompt_page', '开通会员页面链接', 'deepseek_vip_prompt_page_callback', 'deepseek-chat', 'deepseek_main_section');
 
+    // 公告设置字段
+    add_settings_field('deepseek_announcement', '公告说明', 'deepseek_announcement_callback', 'deepseek-chat', 'deepseek_main_section');
+
     // AJAX处理文件上传
     add_action('wp_ajax_deepseek_upload_file', 'deepseek_handle_file_upload');    
     
 }
 add_action('admin_init', 'deepseek_register_settings');
 
+
+// 底部公告说明回调函数
+function deepseek_announcement_callback() {
+    $announcement = get_option('deepseek_announcement', '');
+    ?>
+    <textarea name="deepseek_announcement" rows="5" cols="50" style="width: 400px;"><?php echo esc_textarea($announcement); ?></textarea>
+    <p class="description">输入公告内容，支持HTML格式，如果留空则前台不显示公告。</p>
+    <?php
+}
 
 // 启用网站会员验证回调函数
 function deepseek_vip_check_enabled_callback() {
@@ -430,7 +447,7 @@ function allowed_file_types_callback() {
     $types = get_option('allowed_file_types', 'txt,docx,pdf,xlsx,md');
     ?>
     <input type="text" name="allowed_file_types" value="<?php echo esc_attr($types); ?>" style="width: 300px;" />
-    <p class="description">多个格式用英文逗号分隔，例如：txt,docx,pdf,xlsx,md，具体以你选择的模型为准</p>
+    <p class="description">多个格式用英文逗号分隔，例如：txt,docx,pdf,xlsx,md，具体以你选择的模型为准(图片生成视频的文件格式不受这个设置限制)</p>
     <?php
 }
 
@@ -794,11 +811,11 @@ function qwen_image_model_callback() {
     $model = get_option('qwen_image_model', 'wanx2.1-t2i-turbo');
     echo '<input type="text" name="qwen_image_model" value="' . esc_attr($model) . '" style="width: 500px;" />';
 }
-function qwen_enable_image_callback() {
-    $enabled = get_option('qwen_enable_image', 0);
-    $checked = $enabled ? 'checked' : '';
-    echo '<input type="checkbox" name="qwen_enable_image" value="1" ' . $checked . ' /> 需要设置通义千问图像模型';
+function qwen_video_model_callback() {
+    $model = get_option('qwen_video_model', 'wanx2.1-t2v-turbo');
+    echo '<input type="text" name="qwen_video_model" value="' . esc_attr($model) . '" style="width: 500px;" />';
 }
+
 function qwen_enable_search_callback() {
     $enabled = get_option('qwen_enable_search', 0);
     ?>
@@ -1063,7 +1080,7 @@ function deepseek_render_settings_page() {
             </div>
         <?php endif; ?>
        <p> 插件设置说明：<a href="https://www.wujiit.com/wpaidocs" target="_blank">https://www.wujiit.com/wpaidocs</a><br>
-        Openai接口只有在官方允许的地区才能访问<br>
+        Openai、Gemini、Claude接口只有在官方允许的地区才能访问<br>
     反馈问题请带上错误提示，插件加入了多处的日志调用，方便快速查找问题所在，所以遇到问题了直接把网站错误日志发来。</p>
     </div>
     <?php
@@ -1114,8 +1131,52 @@ function deepseek_handle_file_upload() {
     $file_extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
     $interface = isset($_POST['interface']) ? sanitize_text_field($_POST['interface']) : 'qwen';
     $model = isset($_POST['model']) ? sanitize_text_field($_POST['model']) : '';
+    $qwen_video_models = explode(',', get_option('qwen_video_model', 'wanx2.1-t2v-turbo'));
 
-    // 验证文件类型
+    // 如果是通义千问视频模型，限制文件类型为图片
+    if ($interface === 'qwen' && in_array($model, $qwen_video_models)) {
+        $allowed_image_types = ['jpeg', 'jpg', 'png', 'bmp', 'webp'];
+        if (!in_array($file_extension, $allowed_image_types)) {
+            wp_send_json_error([
+                'message' => '仅支持JPEG、JPG、PNG、BMP、WEBP格式的图片',
+                'type' => 'invalid_type',
+                'allowed_types' => implode(', ', $allowed_image_types)
+            ]);
+            return;
+        }
+
+        // 验证文件大小（通义千问要求不超过10MB）
+        if ($file['size'] > 10 * 1024 * 1024) {
+            wp_send_json_error([
+                'message' => '图片大小超过限制: 10MB',
+                'type' => 'size_exceeded',
+                'max_size' => 10
+            ]);
+            return;
+        }
+
+        // 上传到媒体库
+        require_once(ABSPATH . 'wp-admin/includes/image.php');
+        require_once(ABSPATH . 'wp-admin/includes/file.php');
+        require_once(ABSPATH . 'wp-admin/includes/media.php');
+
+        $attachment_id = media_handle_upload('file', 0);
+        if (is_wp_error($attachment_id)) {
+            wp_send_json_error(['message' => '图片上传失败: ' . $attachment_id->get_error_message()]);
+            return;
+        }
+
+        $image_url = wp_get_attachment_url($attachment_id);
+        wp_send_json_success([
+            'file_id' => $attachment_id,
+            'filename' => $file['name'],
+            'image_url' => $image_url,
+            'interface' => 'qwen'
+        ]);
+        return;
+    }
+
+    // 验证文件类型（非视频模型）
     if (!in_array($file_extension, $allowed_types)) {
         wp_send_json_error([
             'message' => '此文件是不支持的文件类型',
@@ -1125,7 +1186,7 @@ function deepseek_handle_file_upload() {
         return;
     }
 
-    // 验证文件大小
+    // 验证文件大小（非视频模型）
     if ($file['size'] > $max_size) {
         wp_send_json_error([
             'message' => '文件大小超过限制: ' . round($max_size / (1024 * 1024), 2) . 'MB',
@@ -1146,11 +1207,11 @@ function deepseek_handle_file_upload() {
         $is_doc_supported = in_array($model, $support_doc_models[$interface]);
     }
     if (!$is_doc_supported) {
-        wp_send_json_error(['message' => '该模型不支持分析文档，请使用Kimi或者通义千问的qwen-long模型']);
+        wp_send_json_error(['message' => '该模型不支持分析文档，分析文档请使用Kimi或者通义千问的qwen-long模型']);
         return;
     }
 
-    // 接口选择
+    // 接口选择及文件上传
     switch ($interface) {
         case 'qwen':
             $api_key = get_option('qwen_api_key');
@@ -1291,6 +1352,12 @@ function deepseek_chat_shortcode() {
         );
     }
 
+    // 支持联网搜索的模型列表
+    $search_supported_models = [
+        'qwen' => ['qwen-max', 'qwen-plus', 'qwen-turbo'],
+        'xunfei' => ['generalv3', 'generalv3.5', '4.0Ultra']
+    ];
+
     ob_start();
     ?>
     <div id="deepseek-chat-container">
@@ -1412,15 +1479,16 @@ function deepseek_chat_shortcode() {
                     </div>
                 <?php endif; ?>
 
-                <?php if (in_array('qwen', $enabled_interfaces) && $qwen_enable_search == '1'): ?>
-                    <div class="deepseek-option-item deepseek-search-toggle" style="display: none;">
-                        <label class="switch">
-                            <input type="checkbox" id="enable-search">
-                            <span class="slider round"></span>
-                        </label>
-                        <span>联网搜索</span>
-                    </div>
-                <?php endif; ?>
+                <!-- 联网搜索开关 -->
+                <?php if ($qwen_enable_search == '1' && in_array($current_interface, array_keys($search_supported_models))): ?>
+                    <div class="deepseek-option-item deepseek-search-toggle" style="display: none;" data-supported-models='<?php echo json_encode($search_supported_models); ?>'>
+                <label class="switch">
+                    <input type="checkbox" id="enable-search">
+                    <span class="slider round"></span>
+                </label>
+                <span>联网搜索</span>
+            </div>
+        <?php endif; ?>
 
                 <?php
                 $tutorial_title = get_option('ai_tutorial_title', '');
@@ -1451,13 +1519,23 @@ function deepseek_chat_shortcode() {
                     </div>
                 </div>
             </div>
-        </div>
+        
+        <!-- 图片生成视频预览区域 -->
+        <div id="qwen-video-image-preview" style="display: none; margin-top: 10px;">
+        <div id="uploaded-image-container"></div>
+        <button id="remove-uploaded-image">删除</button>
     </div>
-
-    <div id="bottom-description" style="margin-top: 5px; text-align: center;">
-        内容由Ai自动生成，不代表本站观点。
     </div>
-
+</div>
+<?php
+    // 获取公告内容并显示
+    $announcement = get_option('deepseek_announcement', '');
+    if (!empty($announcement)) {
+        echo '<div id="deepseek-announcement">';
+        echo wp_kses_post($announcement);
+        echo '</div>';
+    }
+    ?>
     <script type="text/javascript">
     document.addEventListener('DOMContentLoaded', function() {
         const input = document.getElementById('deepseek-chat-input');
@@ -1495,7 +1573,7 @@ function deepseek_chat_shortcode() {
             'qianfan': '<?php echo get_option('qianfan_model', ''); ?>',
             'hunyuan': '<?php echo get_option('hunyuan_model', ''); ?>',
             'xunfei': '<?php echo get_option('xunfei_model', 'generalv3.5'); ?>',
-            'qwen': '<?php echo get_option('qwen_text_model', 'qwen-max') . ',' . get_option('qwen_image_model', 'wanx2.1-t2i-turbo'); ?>',
+            'qwen': '<?php echo get_option('qwen_text_model', 'qwen-max') . ',' . get_option('qwen_image_model', 'wanx2.1-t2i-turbo') . ',' . get_option('qwen_video_model', 'wanx2.1-t2v-turbo'); ?>',
             'pollinations': '<?php echo get_option('pollinations_model', 'flux'); ?>',
             'custom': '<?php echo get_option('custom_model_params', ''); ?>'
         };
@@ -1573,7 +1651,8 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
         case 'qwen':
             $model_list = array_merge(
                 explode(',', get_option('qwen_text_model', 'qwen-max')),
-                explode(',', get_option('qwen_image_model', 'wanx2.1-t2i-turbo'))
+                explode(',', get_option('qwen_image_model', 'wanx2.1-t2i-turbo')),
+                explode(',', get_option('qwen_video_model', 'wanx2.1-t2v-turbo'))
             );
             break;
         case 'custom':
@@ -1658,7 +1737,7 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
     // 判断是否为通义千问图像模型
     $qwen_image_models = explode(',', get_option('qwen_image_model', 'wanx2.1-t2i-turbo'));
     $is_image_model = ($interface_choice === 'qwen' && in_array($model, $qwen_image_models));
-    if ($is_image_model && get_option('qwen_enable_image')) {
+    if ($is_image_model) {
         $api_key = get_option('qwen_api_key');
         $api_url = 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis';
         $headers = [
@@ -1718,6 +1797,77 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
             ], 500);
         }
     }
+
+    // 通义千问视频模型
+    $qwen_video_models = explode(',', get_option('qwen_video_model', 'wanx2.1-t2v-turbo'));
+    $is_video_model = ($interface_choice === 'qwen' && in_array($model, $qwen_video_models));
+    if ($is_video_model) {
+    $api_key = get_option('qwen_api_key');
+    $api_url = 'https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis';
+    $headers = [
+        'X-DashScope-Async: enable',
+        'Authorization: Bearer ' . $api_key,
+        'Content-Type: application/json'
+    ];
+    $body = [
+        'model' => $model,
+        'input' => ['prompt' => $message],
+        'parameters' => [
+            'prompt_extend' => true
+        ]
+    ];
+
+    // 如果有上传的图片，添加img_url
+    if (!empty($file_ids) && isset($file_ids[0]['image_url'])) {
+        $body['input']['img_url'] = $file_ids[0]['image_url'];
+    }
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $api_url);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+    $response = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($http_code == 200) {
+        $response_data = json_decode($response, true);
+        $task_id = $response_data['output']['task_id'];
+
+        $wpdb->insert($table_name, [
+            'user_id' => $user_id,
+            'conversation_id' => $conversation_id ?: 0,
+            'conversation_title' => $message,
+            'message' => $message,
+            'response' => json_encode([
+                'task_id' => $task_id,
+                'status' => 'pending',
+                'message' => '视频生成中，请稍后查看结果（约5-10分钟）'
+            ])
+        ]);
+
+        if (!$conversation_id) {
+            $conversation_id = $wpdb->insert_id;
+            $wpdb->update($table_name, ['conversation_id' => $conversation_id], ['id' => $conversation_id]);
+        }
+
+        return new WP_REST_Response([
+            'success' => true,
+            'is_video' => true,
+            'task_id' => $task_id,
+            'conversation_id' => $conversation_id,
+            'conversation_title' => $message,
+        ], 200);
+    } else {
+        return new WP_REST_Response([
+            'success' => false,
+            'message' => '视频生成请求失败: ' . $response
+        ], 500);
+    }
+}
 
     // 文本对话分支
     switch ($interface_choice) {
@@ -1812,7 +1962,7 @@ function deepseek_send_message_rest(WP_REST_Request $request) {
         if (!$is_doc_supported) {
             return new WP_REST_Response([
                 'success' => false,
-                'message' => '该模型不支持分析文档，请选择Kimi或者通义千问的qwen-long模型'
+                'message' => '该模型不支持分析文档，分析文档请选择Kimi或者通义千问的qwen-long模型'
             ], 400);
         }
 
@@ -2116,6 +2266,67 @@ function deepseek_check_image_task() {
 add_action('wp_ajax_deepseek_check_image_task', 'deepseek_check_image_task');
 add_action('wp_ajax_nopriv_deepseek_check_image_task', 'deepseek_check_image_task');
 
+function deepseek_check_video_task() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'deepseek_chat_logs';
+    
+    $task_id = sanitize_text_field($_POST['task_id']);
+    $api_key = get_option('qwen_api_key');
+    
+    $url = 'https://dashscope.aliyuncs.com/api/v1/tasks/' . $task_id;
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Authorization: Bearer ' . $api_key,
+        'Content-Type: application/json'
+    ]);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    
+    $response = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($http_code == 200) {
+        $response_data = json_decode($response, true);
+        $task_status = $response_data['output']['task_status'];
+        
+        if ($task_status === 'SUCCEEDED') {
+            $video_url = $response_data['output']['video_url'] ?? '';
+
+            $record = $wpdb->get_row($wpdb->prepare(
+                "SELECT * FROM $table_name WHERE response LIKE %s",
+                '%' . $wpdb->esc_like($task_id) . '%'
+            ));
+
+            if ($record) {
+                $wpdb->update($table_name, 
+                    ['response' => json_encode([
+                        'status' => 'succeeded',
+                        'video_url' => $video_url
+                    ])], 
+                    ['id' => $record->id]
+                );
+            }
+
+            wp_send_json([
+                'success' => true,
+                'task_status' => 'SUCCEEDED',
+                'video_url' => $video_url
+            ]);
+        } else {
+            wp_send_json([
+                'success' => true,
+                'task_status' => $task_status
+            ]);
+        }
+    } else {
+        wp_send_json(['success' => false, 'message' => '视频任务状态查询失败']);
+    }
+}
+add_action('wp_ajax_deepseek_check_video_task', 'deepseek_check_video_task');
+add_action('wp_ajax_nopriv_deepseek_check_video_task', 'deepseek_check_video_task');
+
 // 加载历史对话记录
 function deepseek_load_log() {
     global $wpdb;
@@ -2141,7 +2352,16 @@ function deepseek_load_log() {
     foreach ($logs as $log) {
         $response = json_decode($log->response, true);
         
-        if ($response && isset($response['image_url'])) {
+        // 处理视频
+        if ($response && isset($response['video_url'])) {
+            $html = '<video controls src="' . esc_url($response['video_url']) . '" style="max-width:100%;height:auto;"></video>';
+            $processed[] = array(
+                'message'  => esc_html($log->message),
+                'response' => $html
+            );
+        }
+        // 处理图片
+        else if ($response && isset($response['image_url'])) {
             // 使用message作为默认提示词，如果actual_prompt不存在
             $actual_prompt = isset($response['actual_prompt']) ? esc_html($response['actual_prompt']) : esc_html($log->message);
             $html = '<div class="image-prompt">' . $actual_prompt . '</div>';
@@ -2150,7 +2370,9 @@ function deepseek_load_log() {
                 'message'  => esc_html($log->message),
                 'response' => $html
             );
-        } else {
+        }
+        // 处理文本
+        else {
             $content = '';
             $reasoning_content = '';
             if (is_array($response)) {
@@ -2216,9 +2438,13 @@ add_action('wp_ajax_deepseek_delete_log', 'deepseek_delete_log');
 function deepseek_render_logs_page() {
     global $wpdb;
     $table_name = $wpdb->prefix . 'deepseek_chat_logs';
+    
+    // 处理用户ID搜索
+    $search_user_id = isset($_GET['user_id']) ? intval($_GET['user_id']) : '';
+    $where_clause = $search_user_id ? $wpdb->prepare("WHERE user_id = %d", $search_user_id) : '';
 
     // 删除记录
-    if (isset($_GET['delete_conversation']) && current_user_can('manage_options')) {
+    if (isset($_GET['delete_conversation'])) {
         $conversation_id = intval($_GET['delete_conversation']);
         $wpdb->delete($table_name, ['conversation_id' => $conversation_id], ['%d']);
         echo '<div class="notice notice-success"><p>对话记录已删除。</p></div>';
@@ -2230,24 +2456,47 @@ function deepseek_render_logs_page() {
     $offset = ($current_page - 1) * $per_page;
 
     // 获取总记录数
-    $total_logs = $wpdb->get_var("SELECT COUNT(DISTINCT conversation_id) FROM $table_name");
+    $total_logs = $wpdb->get_var("SELECT COUNT(DISTINCT conversation_id) FROM $table_name $where_clause");
 
-    // 获取当前页的记录
+    // 获取当前页的记录，并关联用户信息
     $logs = $wpdb->get_results($wpdb->prepare(
-        "SELECT * FROM $table_name GROUP BY conversation_id ORDER BY created_at DESC LIMIT %d OFFSET %d",
+        "SELECT cl.*, u.user_login 
+         FROM $table_name cl 
+         LEFT JOIN {$wpdb->users} u ON cl.user_id = u.ID 
+         $where_clause 
+         GROUP BY cl.conversation_id 
+         ORDER BY cl.created_at DESC 
+         LIMIT %d OFFSET %d",
         $per_page, $offset
     ));
 
     ?>
     <div class="wrap">
         <h1>用户AI对话记录</h1>
+        
+        <!-- 用户ID搜索表单 -->
+        <form method="get" class="search-form" style="margin-bottom: 20px;">
+            <input type="hidden" name="page" value="deepseek-logs">
+            <label for="user_id">按用户ID搜索: </label>
+            <input type="number" name="user_id" id="user_id" value="<?php echo esc_attr($search_user_id); ?>" min="1" style="width: 100px;">
+            <input type="submit" class="button" value="搜索">
+            <?php if ($search_user_id): ?>
+                <a href="?page=deepseek-logs" class="button">显示所有记录</a>
+            <?php endif; ?>
+        </form>
+
+        <?php if ($search_user_id): ?>
+            <p>当前显示用户ID <?php echo esc_html($search_user_id); ?> 的对话记录</p>
+        <?php endif; ?>
+
         <table class="wp-list-table widefat fixed striped">
             <thead>
                 <tr>
-                    <th>用户ID</th>
-                    <th>标题</th>
-                    <th>时间</th>
-                    <th>操作</th>
+                    <th style="width: 80px;">用户ID</th>
+                    <th style="width: 150px;">用户名</th>
+                    <th style="width: 300px;">首句消息</th>
+                    <th style="width: 160px;">时间</th>
+                    <th style="width: 100px;">操作</th>
                 </tr>
             </thead>
             <tbody>
@@ -2255,10 +2504,16 @@ function deepseek_render_logs_page() {
                     <?php foreach ($logs as $log) : ?>
                         <tr>
                             <td><?php echo esc_html($log->user_id); ?></td>
-                            <td><?php echo esc_html($log->conversation_title); ?></td>
+                            <td><?php echo esc_html($log->user_login ? $log->user_login : '未知用户'); ?></td>
+                            <td><?php 
+                                $title = mb_strlen($log->conversation_title, 'UTF-8') > 50 
+                                    ? mb_substr($log->conversation_title, 0, 50, 'UTF-8') . '...' 
+                                    : $log->conversation_title;
+                                echo esc_html($title);
+                            ?></td>
                             <td><?php echo esc_html($log->created_at); ?></td>
                             <td>
-                                <a href="?page=deepseek-logs&delete_conversation=<?php echo esc_attr($log->conversation_id); ?>" 
+                                <a href="?page=deepseek-logs&delete_conversation=<?php echo esc_attr($log->conversation_id); ?><?php echo $search_user_id ? '&user_id=' . $search_user_id : ''; ?>" 
                                    class="button" 
                                    onclick="return confirm('确定要删除此对话记录吗？');">删除</a>
                             </td>
@@ -2266,28 +2521,34 @@ function deepseek_render_logs_page() {
                     <?php endforeach; ?>
                 <?php else : ?>
                     <tr>
-                        <td colspan="4">暂无记录。</td>
+                        <td colspan="5">暂无记录。</td>
                     </tr>
                 <?php endif; ?>
             </tbody>
         </table>
 
         <!-- 分页导航 -->
-        <div class="tablenav bottom">
-            <div class="tablenav-pages">
-                <?php
-                $total_pages = ceil($total_logs / $per_page);
-                echo paginate_links([
-                    'base' => add_query_arg('paged', '%#%'),
-                    'format' => '',
-                    'prev_text' => __('« 上一页'),
-                    'next_text' => __('下一页 »'),
-                    'total' => $total_pages,
-                    'current' => $current_page,
-                ]);
-                ?>
+        <?php if ($total_logs > $per_page): ?>
+            <div class="tablenav bottom">
+                <div class="tablenav-pages">
+                    <?php
+                    $total_pages = ceil($total_logs / $per_page);
+                    $args = [
+                        'base' => add_query_arg('paged', '%#%'),
+                        'format' => '',
+                        'prev_text' => __('« 上一页'),
+                        'next_text' => __('下一页 »'),
+                        'total' => $total_pages,
+                        'current' => $current_page,
+                    ];
+                    if ($search_user_id) {
+                        $args['add_args'] = ['user_id' => $search_user_id];
+                    }
+                    echo paginate_links($args);
+                    ?>
+                </div>
             </div>
-        </div>
+        <?php endif; ?>
     </div>
     <?php
 }
@@ -3017,7 +3278,6 @@ function deepseek_uninstall() {
     delete_option('qwen_api_key');
     delete_option('qwen_text_model');
     delete_option('qwen_image_model');
-    delete_option('qwen_enable_image');
     delete_option('custom_api_key');
     delete_option('custom_model_params');
     delete_option('custom_model_url');
