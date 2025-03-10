@@ -3,7 +3,7 @@
 # 小半WordPress ai助手  
 
 [![License](https://img.shields.io/badge/license-GPL-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-4.0-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/4.0)
+[![Version](https://img.shields.io/badge/version-4.0.2-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/4.0.2)
 [![WordPress](https://img.shields.io/badge/WordPress-6.7-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.0-orange.svg)](https://www.php.net/)
 [![Nginx](https://img.shields.io/badge/Nginx-1.2-green.svg)](https://nginx.org/)
@@ -12,7 +12,7 @@
 
 ## 📌 项目简介
 
-全开源免费 - WordPress ai助手插件，可实现：ai对话聊天(文字、图片生成)、ai对话语音播放、ai文章生成、ai文章总结、ai文章翻译、ai生成PPT、ai文档分析、ai智能体应用、文章内容语音播放。  
+全开源免费 - WordPress ai助手插件，可实现：ai对话聊天(文字、图片生成、视频生成)、ai对话语音播放、ai文章生成、ai文章总结、ai文章翻译、ai生成PPT、ai文档分析、ai智能体应用、文章内容语音播放。  
 
 说明1：聊天对话需要网站开启REST API服务，有的用户优化wp的时候可能会关掉REST API。  
 说明2：有的网站缓存配置可能会导致对话无法正常使用，请排除对话页面的缓存。
@@ -38,6 +38,7 @@
 1. 支持文多多AIPPT接口生成PPT文件  
 1. 支持pollinations ai的文生图模型  
 1. 支持通义千问的图片生成模型  
+1. 支持通义千问的视频生成模型(文生视频、图生视频) 
 1. 支持通义千问和讯飞星火部分模型联网搜索
 1. 模型参数是自定义填写  
 1. 系统会用一个单独的数据表保存对话记录的第一句  
