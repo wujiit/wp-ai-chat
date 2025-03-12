@@ -3,7 +3,7 @@
 # 小半WordPress ai助手  
 
 [![License](https://img.shields.io/badge/license-GPL-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-4.0.2-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/4.0.2)
+[![Version](https://img.shields.io/badge/version-4.0.3-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/4.0.3)
 [![WordPress](https://img.shields.io/badge/WordPress-6.7-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.0-orange.svg)](https://www.php.net/)
 [![Nginx](https://img.shields.io/badge/Nginx-1.2-green.svg)](https://nginx.org/)
@@ -12,7 +12,7 @@
 
 ## 📌 项目简介
 
-全开源免费 - WordPress ai助手插件，可实现：ai对话聊天(文字、图片生成、视频生成)、ai对话语音播放、ai文章生成、ai文章总结、ai文章翻译、ai生成PPT、ai文档分析、ai智能体应用、文章内容语音播放。  
+全开源免费 - WordPress ai助手插件，可实现：ai对话聊天(文字、图片生成、视频生成)、ai对话语音播放、ai文章生成、ai文章SEO分析、ai文章总结、ai文章翻译、ai生成PPT、ai文档分析、ai智能体应用、文章内容语音播放。  
 
 说明1：聊天对话需要网站开启REST API服务，有的用户优化wp的时候可能会关掉REST API。  
 说明2：有的网站缓存配置可能会导致对话无法正常使用，请排除对话页面的缓存。
@@ -65,6 +65,7 @@
 1. 支持前台用户选择接口  
 1. 支持kimi和通义千问qwen-long上传文件分析文档内容  
 1. 支持前台用户选择模型参数  
+1. 支持对文章内容进行SEO分析，同时检测错别字  
 
 
 ## 📥 安装
