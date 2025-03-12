@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型以及智能体应用。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 4.0.2
+Version: 4.0.3
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -238,6 +238,7 @@ function deepseek_register_settings() {
     register_setting('deepseek_chat_options_group', 'enable_intelligent_agent'); // 启用智能体应用
     register_setting('deepseek_chat_options_group', 'deepseek_login_prompt'); // 未登录提示
     register_setting('deepseek_chat_options_group', 'qwen_enable_search'); // 模型联网搜索
+    register_setting('deepseek_chat_options_group', 'enable_article_analysis', array('default' => '0', 'sanitize_callback' => 'sanitize_text_field')); // 文章seo分析
 
     //自定义按钮位置设置（右边距和底边距）    
     register_setting('deepseek_chat_options_group', 'ai_helper_right');
@@ -401,11 +402,23 @@ function deepseek_register_settings() {
     // 公告设置字段
     add_settings_field('deepseek_announcement', '公告说明', 'deepseek_announcement_callback', 'deepseek-chat', 'deepseek_main_section');
 
+    // 公告设置字段
+    add_settings_field('enable_article_analysis', '启用文章分析', 'enable_article_analysis_callback', 'deepseek-chat', 'deepseek_main_section');
+
     // AJAX处理文件上传
     add_action('wp_ajax_deepseek_upload_file', 'deepseek_handle_file_upload');    
     
 }
 add_action('admin_init', 'deepseek_register_settings');
+
+// 启用文章分析回调函数
+function enable_article_analysis_callback() {
+    $enabled = get_option('enable_article_analysis', '0');
+    ?>
+    <input type="checkbox" name="enable_article_analysis" value="1" <?php checked(1, $enabled); ?> />
+    <p class="description">启用后，在经典编辑器下将显示文章分析功能，让ai模型对文章内容进行分析。</p>
+    <?php
+}
 
 
 // 底部公告说明回调函数
@@ -3225,6 +3238,223 @@ add_action('wp_ajax_publish_article_ajax', 'deepseek_publish_article_ajax');
 add_action('wp_ajax_nopriv_publish_article_ajax', 'deepseek_publish_article_ajax');
 // 文章生成 结束
 
+
+// 文章分析 开始
+// 在经典编辑器下添加文章分析板块
+function deepseek_add_article_analysis_meta_box() {
+    if (get_option('enable_article_analysis', '0') !== '1') {
+        return; // 未启用则不添加
+    }
+
+    // 仅在经典编辑器中添加
+    global $current_screen;
+    if (isset($current_screen) && $current_screen->is_block_editor()) {
+        return; // Gutenberg 编辑器不显示
+    }
+
+    add_meta_box(
+        'deepseek_article_analysis',
+        '文章AI分析',
+        'deepseek_article_analysis_meta_box_callback',
+        'post',
+        'normal',
+        'high'
+    );
+}
+add_action('add_meta_boxes', 'deepseek_add_article_analysis_meta_box');
+
+// 文章分析板块内容
+function deepseek_article_analysis_meta_box_callback($post) {
+    wp_nonce_field('deepseek_article_analysis_nonce', 'deepseek_article_analysis_nonce');
+    $interface = get_option('article_analysis_interface', 'deepseek');
+    ?>
+    <div id="article-analysis-section">
+        <p>
+            <label for="analysis_interface"><strong>选择AI接口：</strong></label>
+            <select id="analysis_interface" name="analysis_interface">
+                <?php
+                $options = array(
+                    'deepseek' => 'DeepSeek',
+                    'openai' => 'OpenAI',
+                    'qwen' => '通义千问',
+                    'kimi' => 'Kimi',
+                    'doubao' => '豆包AI',
+                    'custom' => '自定义接口'
+                );
+                foreach ($options as $value => $label) {
+                    echo '<option value="' . esc_attr($value) . '" ' . selected($interface, $value, false) . '>' . esc_html($label) . '</option>';
+                }
+                ?>
+            </select>
+            <button type="button" id="analyze-article-btn" class="button button-primary">分析文章</button>
+        </p>
+        <div id="analysis-result" style="margin-top: 20px;">
+            <p><strong>推荐标题：</strong><span id="recommended-title"></span></p>
+            <p><strong>推荐描述：</strong><span id="seo-description"></span></p>
+            <p><strong>错别字检测：</strong><span id="typo-detection"></span></p>
+        </div>
+        <div id="analysis-loading" style="display: none;">分析中，请稍候...</div>
+        <div id="analysis-error" style="color: red; display: none;"></div>
+    </div>
+
+    <script>
+    jQuery(document).ready(function($) {
+        $('#analyze-article-btn').on('click', function() {
+            var postTitle = $('#title').val();
+            var postContent = $('#content').val() || tinyMCE.get('content').getContent({format: 'text'});
+
+            if (!postTitle || !postContent) {
+                alert('请先输入文章标题和内容！');
+                return;
+            }
+
+            $('#analysis-loading').show();
+            $('#analysis-error').hide();
+            $('#recommended-title, #seo-description, #typo-detection').empty();
+
+            var data = {
+                action: 'deepseek_analyze_article',
+                nonce: $('#deepseek_article_analysis_nonce').val(),
+                title: postTitle,
+                content: postContent,
+                interface: $('#analysis_interface').val()
+            };
+
+            $.post(ajaxurl, data, function(response) {
+                $('#analysis-loading').hide();
+                if (response.success) {
+                    $('#recommended-title').text(response.data.recommended_title || '无推荐');
+                    $('#seo-description').text(response.data.seo_description || '无推荐');
+                    $('#typo-detection').text(response.data.typos.length > 0 ? response.data.typos.join(', ') : '未检测到错别字');
+                } else {
+                    $('#analysis-error').text(response.data.message || '分析失败，请重试。').show();
+                }
+            }).fail(function() {
+                $('#analysis-loading').hide();
+                $('#analysis-error').text('请求失败，请检查网络或接口配置。').show();
+            });
+        });
+    });
+    </script>
+    <?php
+}
+
+// AJAX 处理文章分析
+function deepseek_analyze_article() {
+    check_ajax_referer('deepseek_article_analysis_nonce', 'nonce');
+
+    $title = sanitize_text_field($_POST['title']);
+    $content = sanitize_text_field($_POST['content']);
+    $interface = sanitize_text_field($_POST['interface']);
+
+    if (empty($title) || empty($content)) {
+        wp_send_json_error(array('message' => '标题或内容为空'));
+    }
+
+    $api_key = get_option($interface . '_api_key');
+    $model_string = ($interface === 'custom') ? get_option('custom_model_params') : 
+                    ($interface === 'qwen' ? get_option('qwen_text_model') : get_option($interface . '_model'));
+
+    if ($interface === 'deepseek') {
+        $url = 'https://api.deepseek.com/chat/completions';
+        $default_model = 'deepseek-chat';
+    } elseif ($interface === 'openai') {
+        $url = 'https://api.openai.com/v1/chat/completions';
+        $default_model = 'gpt-3.5-turbo';
+    } elseif ($interface === 'qwen') {
+        $url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+        $default_model = 'qwen-max';
+    } elseif ($interface === 'kimi') {
+        $url = 'https://api.moonshot.ai/v1/chat/completions';
+        $default_model = 'moonshot-v1-8k';
+    } elseif ($interface === 'doubao') {
+        $url = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
+        $default_model = '';
+    } elseif ($interface === 'custom') {
+        $url = get_option('custom_model_url');
+        $default_model = '';
+    } else {
+        wp_send_json_error(array('message' => '不支持的接口'));
+    }
+
+    $model_list = array_filter(array_map('trim', explode(',', $model_string)));
+    $model = !empty($model_list) ? $model_list[0] : $default_model;
+
+    if (empty($api_key) || empty($model) || empty($url)) {
+        wp_send_json_error(array('message' => '接口配置缺失'));
+    }
+
+    // 修改提示词，严格要求指定格式
+    $prompt = "请分析以下文章标题和内容，并提供以下信息：\n1. 根据内容推荐一个更合适的标题（简洁且吸引人）；\n2. 根据内容生成一个100-150字符的SEO描述；\n3. 检测内容中可能存在的错别字并列出（如果没有则返回‘无’）。\n\n标题：{$title}\n内容：{$content}\n\n严格按照以下格式返回结果，不得包含多余符号或Markdown标记（如```json）：\n推荐标题：你的推荐标题\nSEO描述：你的SEO描述（100-150字符）\n错别字检测：错别字1,错别字2 或 无";
+
+    $payload = array(
+        'model' => $model,
+        'messages' => array(
+            array('role' => 'system', 'content' => 'You are a helpful assistant skilled in content analysis.'),
+            array('role' => 'user', 'content' => $prompt)
+        ),
+        'temperature' => 0.7,
+        'max_tokens' => 1000
+    );
+
+    $headers = array(
+        'Authorization: Bearer ' . $api_key,
+        'Content-Type: application/json'
+    );
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+
+    $response = curl_exec($ch);
+    if (curl_errno($ch)) {
+        wp_send_json_error(array('message' => 'API请求失败：' . curl_error($ch)));
+    }
+    curl_close($ch);
+
+    $data = json_decode($response, true);
+    if (!isset($data['choices'][0]['message']['content'])) {
+        wp_send_json_error(array('message' => 'API返回数据异常'));
+    }
+
+    $result_text = $data['choices'][0]['message']['content'];
+
+    // 解析返回的文本
+    $lines = explode("\n", trim($result_text));
+    $result = array(
+        'recommended_title' => '',
+        'seo_description' => '',
+        'typos' => array()
+    );
+
+    foreach ($lines as $line) {
+        if (strpos($line, '推荐标题：') === 0) {
+            $result['recommended_title'] = trim(substr($line, strlen('推荐标题：')));
+        } elseif (strpos($line, 'SEO描述：') === 0) {
+            $result['seo_description'] = trim(substr($line, strlen('SEO描述：')));
+        } elseif (strpos($line, '错别字检测：') === 0) {
+            $typos_str = trim(substr($line, strlen('错别字检测：')));
+            if ($typos_str === '无') {
+                $result['typos'] = array();
+            } else {
+                $result['typos'] = array_filter(array_map('trim', explode(',', $typos_str)));
+            }
+        }
+    }
+
+    // 验证解析结果是否完整
+    if (empty($result['recommended_title']) || empty($result['seo_description'])) {
+        wp_send_json_error(array('message' => '分析结果格式不完整'));
+    }
+
+    wp_send_json_success($result);
+}
+add_action('wp_ajax_deepseek_analyze_article', 'deepseek_analyze_article');
+// 文章分析 结束
 
 // 处理AI对话语音朗读的TTS请求
 function deepseek_tts() {
