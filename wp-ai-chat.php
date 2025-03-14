@@ -72,7 +72,7 @@ function deepseek_add_settings_link($links) {
 add_filter('plugin_action_links_' . plugin_basename(__FILE__), 'deepseek_add_settings_link');
 
 // 注册激活钩子，确保插件启用时会调用子文件中的函数
-register_activation_hook(__FILE__, 'deepseek_create_ppt_page');
+register_activation_hook(__FILE__, 'docmee_create_ppt_page');
 
 // 创建对话页面
 function deepseek_create_chat_page() {
