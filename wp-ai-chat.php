@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型以及智能体应用。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 4.0.3
+Version: 4.0.4
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -245,6 +245,12 @@ function deepseek_register_settings() {
     register_setting('deepseek_chat_options_group', 'ai_helper_bottom');
     register_setting('deepseek_chat_options_group', 'ai_helper_name'); // 助手名称
     register_setting('deepseek_chat_options_group', 'ai_helper_icon'); // 图标链接
+    // 按钮背景颜色
+    register_setting('deepseek_chat_options_group', 'ai_helper_background', array(
+        'sanitize_callback' => 'sanitize_text_field',
+        'default' => 'linear-gradient(135deg, #6EE7B7, #3B82F6)'
+    ));
+
     // 自定义入口相关设置
     register_setting('deepseek_chat_options_group', 'enable_custom_entry');
     register_setting('deepseek_chat_options_group', 'custom_entry_title');
@@ -350,21 +356,18 @@ function deepseek_register_settings() {
     // ai助手入口
     add_settings_field('show_ai_helper', '网站前台显示AI助手入口', 'show_ai_helper_callback', 'deepseek-chat', 'deepseek_main_section');    
 
-    // 启用智能体应用
-    add_settings_field('enable_intelligent_agent', '前台显示智能体应用入口', 'enable_intelligent_agent_callback', 'deepseek-chat', 'deepseek_main_section');
-
     // AI助手按钮位置设置
     add_settings_field('ai_helper_right', 'AI助手按钮右边距', 'ai_helper_right_callback', 'deepseek-chat', 'deepseek_main_section');
     add_settings_field('ai_helper_bottom', 'AI助手按钮底边距', 'ai_helper_bottom_callback', 'deepseek-chat', 'deepseek_main_section');
-
     // 助手名称设置
     add_settings_field('ai_helper_name', 'AI助手名称', 'ai_helper_name_callback', 'deepseek-chat', 'deepseek_main_section');
-    
     // 助手图标链接设置
-    add_settings_field('ai_helper_icon', 'AI助手图标链接', 'ai_helper_icon_callback', 'deepseek-chat', 'deepseek_main_section');    
+    add_settings_field('ai_helper_icon', 'AI助手图标链接', 'ai_helper_icon_callback', 'deepseek-chat', 'deepseek_main_section');
+    // 助手按钮背景颜色
+    add_settings_field('ai_helper_background', 'AI助手按钮背景颜色', 'ai_helper_background_callback', 'deepseek-chat', 'deepseek_main_section');    
 
-    // 未登录提示文字
-    add_settings_field('deepseek_login_prompt', '未登录提示文字', 'deepseek_login_prompt_callback', 'deepseek-chat', 'deepseek_main_section');
+    // 启用智能体应用
+    add_settings_field('enable_intelligent_agent', '前台显示智能体应用入口', 'enable_intelligent_agent_callback', 'deepseek-chat', 'deepseek_main_section');
 
     // 自定义入口设置项
     add_settings_field('enable_custom_entry', '对话页面显示自定义入口', 'enable_custom_entry_callback', 'deepseek-chat', 'deepseek_main_section');
@@ -373,12 +376,6 @@ function deepseek_register_settings() {
 
     // AI对话语音朗读
     add_settings_field('enable_ai_voice_reading', '启用AI对话语音播放', 'enable_ai_voice_reading_callback', 'deepseek-chat', 'deepseek_main_section');
-
-    // 文章总结框
-    add_settings_field('enable_ai_summary', '文章AI总结', 'enable_ai_summary_callback', 'deepseek-chat', 'deepseek_main_section');
-
-    // 文章总结接口
-    add_settings_field('summary_interface_choice', '文章总结接口', 'summary_interface_choice_callback', 'deepseek-chat', 'deepseek_main_section');
 
     // 接口切换显示开关
     add_settings_field('show_interface_switch', '前台显示接口切换', 'show_interface_switch_callback', 'deepseek-chat', 'deepseek_main_section');
@@ -402,7 +399,16 @@ function deepseek_register_settings() {
     // 公告设置字段
     add_settings_field('deepseek_announcement', '公告说明', 'deepseek_announcement_callback', 'deepseek-chat', 'deepseek_main_section');
 
-    // 公告设置字段
+    // 未登录提示文字
+    add_settings_field('deepseek_login_prompt', '未登录提示文字', 'deepseek_login_prompt_callback', 'deepseek-chat', 'deepseek_main_section');
+
+    // 文章总结
+    add_settings_field('enable_ai_summary', '文章AI总结', 'enable_ai_summary_callback', 'deepseek-chat', 'deepseek_main_section');
+
+    // 文章总结接口
+    add_settings_field('summary_interface_choice', '文章总结接口', 'summary_interface_choice_callback', 'deepseek-chat', 'deepseek_main_section');
+
+    // 启用文章分析
     add_settings_field('enable_article_analysis', '启用文章分析', 'enable_article_analysis_callback', 'deepseek-chat', 'deepseek_main_section');
 
     // AJAX处理文件上传
@@ -641,50 +647,51 @@ function enable_ai_voice_reading_callback() {
     echo '<input type="checkbox" name="enable_ai_voice_reading" value="1" ' . checked(1, $checked, false) . ' />';
 }
 
-
+// 前台ai助手按钮
 // 助手入口处理函数回调
 function show_ai_helper_callback() {
     $checked = get_option('show_ai_helper', '0');
     echo '<input type="checkbox" name="show_ai_helper" value="1" ' . checked(1, $checked, false) . ' />';
 }
-
 // 助手名称回调函数
 function ai_helper_name_callback() {
     $name = get_option('ai_helper_name', 'AI 助手'); // 默认名称为"AI 助手"
     echo '<input type="text" name="ai_helper_name" value="' . esc_attr($name) . '" style="width:200px;" />';
     echo '<p class="description">输入AI助手的自定义名称</p>';
 }
-
-// 图标链接回调函数
+// 助手按钮图标链接回调函数
 function ai_helper_icon_callback() {
     $icon = get_option('ai_helper_icon', ''); // 默认空值
     echo '<input type="text" name="ai_helper_icon" value="' . esc_attr($icon) . '" style="width:300px;" />';
     echo '<p class="description">输入图标图片的URL链接</p>';
 }
-
+// 助手按钮背景颜色回调函数
+function ai_helper_background_callback() {
+    $background = get_option('ai_helper_background', 'linear-gradient(135deg, #6EE7B7, #3B82F6)');
+    echo '<input type="text" name="ai_helper_background" value="' . esc_attr($background) . '" style="width:300px;" />';
+    echo '<p class="description">输入CSS背景颜色值，例如：#6EE7B7 或 linear-gradient(135deg, #6EE7B7, #3B82F6)</p>';
+}
 // AI助手按钮位置右边距回调函数
 function ai_helper_right_callback() {
     $right = get_option('ai_helper_right', '5%'); // 默认右边距为5%
     echo '<input type="text" name="ai_helper_right" value="' . esc_attr($right) . '" style="width:100px;" />';
     echo '<p class="description">输入按钮距离右侧的距离，例如：5% 或 20px</p>';
 }
-
 // AI助手按钮位置底边距回调函数
 function ai_helper_bottom_callback() {
     $bottom = get_option('ai_helper_bottom', '50%'); // 默认底边距为50%
     echo '<input type="text" name="ai_helper_bottom" value="' . esc_attr($bottom) . '" style="width:100px;" />';
     echo '<p class="description">输入按钮距离底部的距离，例如：50% 或 30px</p>';
 }
-
 // 在网站前台显示AI助手入口
 function deepseek_display_ai_helper() {
     if (get_option('show_ai_helper', '0') == '1' && !is_page_with_deepseek_chat_shortcode()) {
         $ai_helper_right = get_option('ai_helper_right', '5%');
         $ai_helper_bottom = get_option('ai_helper_bottom', '50%');
-        $ai_helper_name = get_option('ai_helper_name', 'AI 助手'); // 获取自定义名称
-        $ai_helper_icon = get_option('ai_helper_icon', ''); // 获取自定义图标链接
+        $ai_helper_name = get_option('ai_helper_name', 'AI 助手');
+        $ai_helper_icon = get_option('ai_helper_icon', '');
+        $ai_helper_background = get_option('ai_helper_background', 'linear-gradient(135deg, #6EE7B7, #3B82F6)');
 
-        // 根据是否设置图标链接来决定图标显示方式
         $icon_html = $ai_helper_icon ? 
             '<img src="' . esc_url($ai_helper_icon) . '" style="width: 24px; height: 24px; vertical-align: middle;">' : 
             '<span style="font-size: 24px;">&#129503;</span>';
@@ -699,7 +706,7 @@ function deepseek_display_ai_helper() {
             font-size: 18px;
             font-weight: bold;
             color: #fff;
-            background: linear-gradient(135deg, #6EE7B7, #3B82F6);
+            background: ' . esc_attr($ai_helper_background) . ';
             padding: 5px 10px;
             border-radius: 15px;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
@@ -708,8 +715,28 @@ function deepseek_display_ai_helper() {
             align-items: center;
             gap: 5px;
         ">
-            ' . $icon_html . ' ' . esc_html($ai_helper_name) . '
+            ' . $icon_html . '
+            <span class="ai-helper-text">' . esc_html($ai_helper_name) . '</span>
         </div>';
+
+        echo '<style>
+            @media (max-width: 768px) {
+                #ai-helper-button {
+                    padding: 8px;
+                    border-radius: 50%;
+                    width: 40px;
+                    height: 40px;
+                    justify-content: center;
+                }
+                #ai-helper-button .ai-helper-text {
+                    display: none;
+                }
+                #ai-helper-button img,
+                #ai-helper-button span {
+                    margin: 0 !important;
+                }
+            }
+        </style>';
 
         echo '<script>
             document.getElementById("ai-helper-button").addEventListener("click", function() {
@@ -750,6 +777,7 @@ function is_page_with_deepseek_chat_shortcode() {
     // 检查页面内容是否包含 [deepseek_chat] 短代码
     return has_shortcode($post->post_content, 'deepseek_chat');
 }
+// 前台ai助手按钮end
 
 // 查找包含 [deepseek_chat] 短代码的页面 用于跳转对话页面
 function get_deepseek_chat_page() {
@@ -778,7 +806,7 @@ add_action('wp_ajax_nopriv_get_deepseek_chat_page', 'get_deepseek_chat_page');
 function pollinations_model_callback() {
     $model = get_option('pollinations_model', 'flux'); // 默认模型为flux
     echo '<input type="text" name="pollinations_model" value="' . esc_attr($model) . '" style="width: 500px;" />';
-    echo '<p class="description">可用模型参考: <a href="https://image.pollinations.ai/models" target="_blank">Pollinations Models</a>，默认: flux，使用Pollinations最好是海外服务器，内地服务器请注意请求时间。</p>';
+    echo '<p class="description">使用Pollinations最好是海外服务器，内地服务器请注意请求时间。</p>';
 }
 
 // Gemini 回调函数
@@ -970,6 +998,7 @@ function get_deepseek_balance() {
 // 设置页面
 function deepseek_render_settings_page() {
     $balance = get_deepseek_balance();
+    $api_key = get_option('deepseek_api_key'); // 获取deepseek API Key
     ?>
     <style>
         /* 设置页面整体样式 */
@@ -1083,18 +1112,22 @@ function deepseek_render_settings_page() {
             submit_button();
             ?>
         </form>
-        <?php if ($balance !== false): ?>
+        <?php 
+        // 如果有余额信息则显示余额
+        if ($balance !== false): ?>
             <div style="margin-top: 20px;">
                 <strong>DeepSeek 余额:</strong> <?php echo esc_html($balance); ?> CNY
             </div>
-        <?php else: ?>
+        <?php 
+        // 只有当API Key不为空且获取余额失败时才显示错误提示
+        elseif (!empty($api_key)): ?>
             <div style="margin-top: 20px; color: red;">
                 无法获取DeepSeek余额信息，请检查DeepSeek官方API Key是否正确，如果你不用DeepSeek官方接口就无视。
             </div>
         <?php endif; ?>
        <p> 插件设置说明：<a href="https://www.wujiit.com/wpaidocs" target="_blank">https://www.wujiit.com/wpaidocs</a><br>
         Openai、Gemini、Claude接口只有在官方允许的地区才能访问<br>
-    反馈问题请带上错误提示，插件加入了多处的日志调用，方便快速查找问题所在，所以遇到问题了直接把网站错误日志发来。</p>
+    反馈问题请带上错误提示，插件加入了日志调用，方便快速查找问题所在，所以遇到问题了直接把网站错误日志发来。</p>
     </div>
     <?php
 }
