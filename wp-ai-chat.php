@@ -3,7 +3,7 @@
 Plugin Name: 小半WordPress ai助手
 Description: WordPress Ai助手插件，支持对话聊天、文章生成、文章总结、ai生成PPT，可对接deepseek、通义千问、豆包等模型以及智能体应用。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 4.0.4
+Version: 4.0.5
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
@@ -1413,16 +1413,17 @@ function deepseek_chat_shortcode() {
                 <button id="deepseek-new-chat">开启新对话</button>
                 <?php if (get_option('enable_intelligent_agent', '0') == '1'): ?>
                     <div id="deepseek-agent-title" class="deepseek-agent-title" style="cursor: pointer;">智能体应用</div>
-                    <?php 
-                    if (get_option('enable_custom_entry', '0') == '1') {
-                        $custom_title = get_option('custom_entry_title', '');
-                        $custom_url = get_option('custom_entry_url', '');
-                        if (!empty($custom_title) && !empty($custom_url)) {
-                            echo '<a href="' . esc_url($custom_url) . '" target="_blank" class="deepseek-custom-entry-title">' . esc_html($custom_title) . '</a>';
-                        }
-                    }
-                    ?>
                 <?php endif; ?>
+                <?php 
+                // 独立显示自定义入口，不依赖智能体应用入口
+                if (get_option('enable_custom_entry', '0') == '1') {
+                    $custom_title = get_option('custom_entry_title', '');
+                    $custom_url = get_option('custom_entry_url', '');
+                    if (!empty($custom_title) && !empty($custom_url)) {
+                        echo '<a href="' . esc_url($custom_url) . '" target="_blank" class="deepseek-custom-entry-title">' . esc_html($custom_title) . '</a>';
+                    }
+                }
+                ?>
                 <ul>
                     <?php if (!empty($history)): ?>
                         <?php foreach ($history as $log): ?>

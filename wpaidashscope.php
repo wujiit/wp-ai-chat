@@ -55,9 +55,11 @@ function deepseek_send_agent_message(WP_REST_Request $request) {
         return $a['app_id'] === $app_id;
     });
     $agent = reset($agent);
-    if (!$agent) {
+
+    // 检查智能体是否存在
+    if (!$agent || !is_array($agent) || !isset($agent['provider'])) {
         header('Content-Type: text/event-stream; charset=UTF-8');
-        echo "data: " . json_encode(['error' => '智能体未找到'], JSON_UNESCAPED_UNICODE) . "\n\n";
+        echo "data: " . json_encode(['error' => '智能体未找到或配置无效'], JSON_UNESCAPED_UNICODE) . "\n\n";
         flush();
         exit;
     }
