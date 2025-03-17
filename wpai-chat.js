@@ -132,15 +132,18 @@ document.addEventListener('DOMContentLoaded', function() {
     if (interfaceSelect) {
         interfaceSelect.addEventListener('change', function() {
             updateModelSelectOptions();
+            // 清空之前的模型选择
+            localStorage.removeItem('selectedModel_' + this.value);
         });
     }
     
     if (modelSelect) {
         modelSelect.addEventListener('change', function() {
+            var selectedInterface = interfaceSelect.value;
+            localStorage.setItem('selectedModel_' + selectedInterface, this.value); // 保存当前模型选择
             var searchToggle = document.querySelector('.deepseek-search-toggle');
             if (searchToggle) {
                 var supportedModels = JSON.parse(searchToggle.getAttribute('data-supported-models'));
-                var selectedInterface = interfaceSelect.value;
                 var currentModel = this.value;
                 var isSupported = supportedModels[selectedInterface] && supportedModels[selectedInterface].includes(currentModel);
                 searchToggle.style.display = isSupported ? 'flex' : 'none';
@@ -349,6 +352,15 @@ function updateModelSelectOptions() {
         modelSelect.appendChild(option);
     });
 
+    // 从 localStorage 恢复用户选择的模型
+    var storedModel = localStorage.getItem('selectedModel_' + selectedInterface);
+    if (storedModel && models.includes(storedModel)) {
+        modelSelect.value = storedModel;
+    } else {
+        // 如果没有保存的选择，使用默认值（第一个模型）
+        modelSelect.value = models[0];
+    }
+
     // 控制联网搜索开关显示
     if (searchToggle) {
         var supportedModels = JSON.parse(searchToggle.getAttribute('data-supported-models'));
@@ -430,8 +442,13 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // 当模型切换时，更新上传区域显示
-document.getElementById('chat-model-select').addEventListener('change', function() {
-    updateUploadedFilesList();
+document.addEventListener('DOMContentLoaded', function() {
+    const modelSelect = document.getElementById('chat-model-select');
+    if (modelSelect) {
+        modelSelect.addEventListener('change', function() {
+            updateUploadedFilesList();
+        });
+    }
 });
 
 // 普通对话框已上传文件列表

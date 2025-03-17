@@ -1624,6 +1624,8 @@ function deepseek_chat_shortcode() {
             'pollinations': '<?php echo get_option('pollinations_model', 'flux'); ?>',
             'custom': '<?php echo get_option('custom_model_params', ''); ?>'
         };
+        var current_interface = '<?php echo esc_js($current_interface); ?>';
+        var default_model = model_params[current_interface].split(',')[0];
     </script>
 
     <?php
