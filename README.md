@@ -16,8 +16,7 @@
 不会用的先看文档，就一个基础配置和apikey对接的事，这种插件没有什么高难度要求。
 
 
-这个项目暂时不更新新功能了，目前不影响使用。
-以后偏向商业源码无忌AI工具相关的更新： https://www.wujiit.com
+商业源码无忌AI工具相关的更新： https://www.wujiit.com
 
 
 ## 🚀 功能特性
@@ -112,6 +111,7 @@ ppt调用js文件： docmee-ui-sdk-iframe.min.js
 Markdown解析文件： marked.min.js 
 
 
-![2fa114d7cc7d22ae16005bb39925a2df.jpeg](https://i.miji.bid/2025/03/02/2fa114d7cc7d22ae16005bb39925a2df.jpeg)
-![be8d09585a3c7da555d8edd2997d46bf.jpeg](https://i.miji.bid/2025/02/24/be8d09585a3c7da555d8edd2997d46bf.jpeg)
-![a979fdb418172e3cbb8241d211e5fff5.jpeg](https://i.miji.bid/2025/02/17/a979fdb418172e3cbb8241d211e5fff5.jpeg)
+## 赞助合作
+本项目的CDN加速和安全防护由腾讯EdgeOne赞助。
+CDN acceleration and security protection for this project are sponsored by Tencent EdgeOne.
+[![EdgeOne](https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png)](https://edgeone.ai/?from=github)
