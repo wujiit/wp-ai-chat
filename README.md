@@ -19,7 +19,6 @@
 
 我现在所有开源的Wordpress的插件，大概30多款，均可以在 https://www.wujiit.com/wpplugins 下载
 
-商业源码无忌AI工具相关的更新： https://www.wujiit.com
 
 
 ## 🚀 功能特性
