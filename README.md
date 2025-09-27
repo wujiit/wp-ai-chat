@@ -15,9 +15,12 @@
 全开源免费 - WordPress ai助手插件，可实现：ai对话聊天(文字、图片生成、视频生成)、ai对话语音播放、ai文章生成、ai文章SEO分析、ai文章总结、ai文章翻译、ai生成PPT、ai文档分析、ai智能体应用、文章内容语音播放。  
 不会用的先看文档，就一个基础配置和apikey对接的事，这种插件没有什么高难度要求。
 
-这个插件不更新了，你有什么其他插件，想要的功能可以联系我，如果刚好我也需要，我会免费开发开源出来。  
+这个插件不更新了。
 
-我现在所有开源的Wordpress的插件，大概30多款，均可以在 https://www.wujiit.com/wpplugins 下载
+https://www.wujiit.com/  
+首个基于Wordpress的综合AI工具站，单个功能源码购买或者全部购买，可联系。
+
+我现在所有开源免费的Wordpress的插件，大概30多款，均可以在 https://www.wujiit.com/wpplugins 下载
 
 
 
@@ -93,7 +96,6 @@ php版本：php 8.0
 
 如果插件彻底不用了，自己到数据库去删掉这个数据表：deepseek_chat_logs、deepseek_agent_chat_logs这2个数据表。
 
-教程：https://www.wujiit.com/wpaidocs
 
 主题页面需要支持全宽或者全屏模式，不然很狭窄。如果不支持就自己查看你主题的样式，通过代码实现deepseek助手页面全屏显示。  
 
