@@ -17,10 +17,9 @@
 
 这个插件不更新了。
 
-https://www.wujiit.com/  
-首个基于Wordpress的综合AI工具站，所有功能都已经开源(除了主题)。
 
-我现在所有开源免费的Wordpress的插件，大概150多款，均可以在 https://www.wujiit.com/wpplugins 下载
+
+我现在所有开源免费的Wordpress的插件，均可以在 https://www.wujiit.com/wpplugins 下载
 
 
 
