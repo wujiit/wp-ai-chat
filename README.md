@@ -1,127 +1,176 @@
-<img src="https://github.com/suqicloud/wp-ai-chat/blob/main/ic_logo.png" width="60">
+# 启灵Ai助手（wp-ai-chat）
 
-# 小半WordPress ai助手  
+`启灵Ai助手` 是一个基于 WordPress 的 AI 插件，集成了对话、智能体、文章工具、翻译朗读、AI PPT 等功能。
 
-[![License](https://img.shields.io/badge/license-GPL-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-4.0.5-green.svg)](https://github.com/suqicloud/wp-ai-chat/releases/tag/4.0.5)
-[![WordPress](https://img.shields.io/badge/WordPress-6.7-blue.svg)](https://wordpress.org/)
-[![PHP](https://img.shields.io/badge/PHP-8.0-orange.svg)](https://www.php.net/)
-[![Nginx](https://img.shields.io/badge/Nginx-1.2-green.svg)](https://nginx.org/)
+- 插件版本：`4.0.5`
+- 插件主文件：`wp-ai-chat.php`
+- 适用场景：站内 AI 助手、文章增强、站点内容生产
 
+## 功能概览
 
+1. AI 对话助手（短代码：`[deepseek_chat]`）
+2. 智能体应用对话（阿里/腾讯/火山/扣子）
+3. 对话文件上传（文档分析、图像视频任务）
+4. 文章 AI 总结（发布后自动标记，首次访问生成）
+5. 后台文章生成（支持流式输出）
+6. 经典编辑器文章 AI 分析（标题/SEO/错别字）
+7. 文章翻译与语音朗读（文章前台控制条）
+8. AI PPT 生成（短代码：`[docmee_ppt]`）
+9. 对话记录与文件列表管理
 
-## 📌 项目简介
+## 环境要求
 
-全开源免费 - WordPress ai助手插件，可实现：ai对话聊天(文字、图片生成、视频生成)、ai对话语音播放、ai文章生成、ai文章SEO分析、ai文章总结、ai文章翻译、ai生成PPT、ai文档分析、ai智能体应用、文章内容语音播放。  
-不会用的先看文档，就一个基础配置和apikey对接的事，这种插件没有什么高难度要求。
+- WordPress（建议 `6.x`）
+- PHP（建议 `7.4+`）
+- PHP 扩展：`curl`、`mbstring`、`json`
+- 站点可访问外部模型 API（DeepSeek、通义千问、OpenAI 等）
+- 建议启用 HTTPS
 
-这个插件不更新了。
+## 安装方式
 
+1. 将 `wp-ai-chat` 文件夹上传到 `wp-content/plugins/`。
+2. 在 WordPress 后台启用插件。
+3. 启用后插件会自动创建页面：`启灵Ai助手`（包含 `[deepseek_chat]`）和 `AIPPT生成`（包含 `[docmee_ppt]`）。
 
+如果自动创建失败，可手动新建页面并写入对应短代码。
 
-我现在所有开源免费的Wordpress的插件，均可以在 https://www.wujiit.com/wpplugins 下载
+## 后台菜单
 
+启用后在后台出现主菜单 `启灵Ai助手`，包含以下子菜单：
 
+- 对话设置
+- 对话记录
+- 文章生成
+- 翻译语音
+- PPT生成
+- 智能体应用
+- 智能体记录
+- 文件列表
 
-## 🚀 功能特性
+## 快速开始（建议顺序）
 
-1. 内置deepseek文本接口  
-1. 内置阿里通义千问文本接口  
-1. 内置百度千帆(文心一言)文本接口  
-1. 内置豆包ai文本接口  
-1. 内置Kimi文本接口  
-1. 内置OpenAI文本接口  
-1. 内置腾讯混元文本接口  
-1. 内置Grok文本接口  
-1. 内置Gemini文本接口 
-1. 内置Claude文本接口 
-1. 内置讯飞星火文本接口  
-1. 内置自定义AI文本模型接口  
-1. 支持阿里智能体应用对接  
-1. 支持火山引擎智能体应用对接  
-1. 支持腾讯元器智能体应用对接  
-1. 支持字节扣子智能体应用对接  
-1. 支持文多多AIPPT接口生成PPT文件  
-1. 支持pollinations ai的文生图模型  
-1. 支持通义千问的图片生成模型  
-1. 支持通义千问的视频生成模型(文生视频、图生视频) 
-1. 支持通义千问和讯飞星火部分模型联网搜索
-1. 模型参数是自定义填写  
-1. 系统会用一个单独的数据表保存对话记录的第一句  
-1. 用户可以删掉自己的历史对话记录  
-1. 后台可以删掉用户的对话记录  
-1. 后台可以删掉用户的智能体应用对话  
-1. 可以通过关键词生成文章  
-1. 可以通过AI接口对文章进行总结  
-1. 前台显示AI助手入口  
-1. 只允许登录用户使用  
-1. 支持Markdown格式
-1. DeepSeek余额信息  
-1. 通过AI接口对文章进行翻译  
-1. 支持对接腾讯云、百度云 TTS服务实现语音播放文章内容  
-1. 可以实现语音播放AI回复的文字内容  
-1. 可以自定义提示词  
-1. 自定义提示词教程链接  
-1. Markdown内容板块自动加载复制按钮  
-1. 支持违规关键词检测  
-1. AI生成PPT可以验证会员权限(部分网站可能不行)  
-1. 智能体应用开场问题  
-1. 自定义前台ai助手名称等  
-1. 自定义未登录提示文字  
-1. 支持前台用户选择接口  
-1. 支持kimi和通义千问qwen-long上传文件分析文档内容  
-1. 支持前台用户选择模型参数  
-1. 支持对文章内容进行SEO分析，同时检测错别字  
+1. 进入 `启灵Ai助手 > 对话设置`，填写 API Key 和模型参数。
+2. 在 `启用的对话接口` 中勾选要开放的模型接口，设置默认接口。
+3. 打开自动创建的 `启灵Ai助手` 页面测试聊天。
+4. 按需开启：联网搜索、文件上传、智能体入口、文章总结、对话语音等扩展功能。
 
+## 各模块使用说明
 
-## 📥 安装
+### 1) AI 对话（`[deepseek_chat]`）
 
-1. 下载最新版本文件。
-2. 进入WordPress插件后台
-3. 上传本地文件包安装
+- 前台显示聊天窗口、历史记录、接口切换、模型参数选择等。
+- 当前版本默认要求用户登录后才能发送对话请求。
+- 支持关键词拦截、上下文记忆轮数、公告、自定义提示词、教程入口链接。
+- 可启用“在线联网搜索”（按支持模型生效）。
 
-或者直接上传到服务器的网站插件目录/wp-content/plugins也行，记得设置权限。  
+提示：插件仅在“页面（page）且包含 `[deepseek_chat]`”时加载聊天前端资源。
 
-开发基础：WordPress 6.7.1  
-php版本：php 8.0  
+### 2) 智能体应用
 
-## 🛠️ 使用方法
+在 `启灵Ai助手 > 智能体应用` 配置：
 
-插件启用会自动创建一个前台对话页面。如果没有自动创建，就自己手动加短代码：  [deepseek_chat]  
+- 提供商：阿里、腾讯、扣子、火山
+- 字段：名称、描述、图标、应用 ID
+- 腾讯智能体可配置单独 Token
+- 可配置开场问题和是否允许该智能体上传文件
 
-1 - 文章翻译的接口要单独设置，因为这本来是我另外一个插件的，我合并过来了，不想折腾，就直接用了。   
-2 - ai生成PPT也是独立插件进行的合并，并且这个功能原本是根据我自己用的主题调整的，可能兼容性不好。    
+前台在聊天页点击“智能体应用”进入对应会话。
 
+### 3) 文件上传
 
-如果插件彻底不用了，自己到数据库去删掉这个数据表：deepseek_chat_logs、deepseek_agent_chat_logs这2个数据表。
+- 普通对话文件上传：在 `对话设置` 中开启。
+- 文档分析模型限制：`Kimi`、`OpenAI`、`通义千问 qwen-long`。
+- 视频任务场景会按模型限制上传为图片。
+- 智能体文件上传在当前版本要求登录且具备上传权限。
 
+### 4) 文章 AI 总结
 
-主题页面需要支持全宽或者全屏模式，不然很狭窄。如果不支持就自己查看你主题的样式，通过代码实现deepseek助手页面全屏显示。  
+- 在 `对话设置` 中开启“文章AI总结”并选择总结接口。
+- 文章发布后会被标记为“待总结”。
+- 首次访问文章页时生成总结，并展示在正文前。
 
-这款插件最早是为了测试deepseek自己写代码的能力，有一部分是deepseek自己写的代码(ai对话对接deepseek和最早版本的文章生成)，后面又合并了其他插件，所以代码里面的函数名称啥的看起来很乱，但是都写了注释。  
+### 5) 文章生成（后台）
 
+路径：`启灵Ai助手 > 文章生成`
 
-## 文件说明
+- 输入关键词，选择接口，按需勾选联网搜索后生成文章。
+- 生成完成后可直接发布到选定分类并设置标签。
+- 当前版本已增加请求验证（nonce）与后台权限校验。
 
-主文件： wp-ai-chat.php  
-翻译语音文件： wpaitranslate.php  
-ai生成ppt文件： wpaippt.php  
-智能体应用文件： wpaidashscope.php  
-主要js文件： wpai-chat.js  
-css文件：wpai-style.css  
-翻译语音js文件： wpai-script.js  
-ppt调用js文件： docmee-ui-sdk-iframe.min.js  
-Markdown解析文件： marked.min.js 
+### 6) 文章 AI 分析（经典编辑器）
 
+- 在 `对话设置` 中启用“文章分析”后生效。
+- 仅在经典编辑器显示分析面板。
+- 可输出推荐标题、SEO 描述、错别字检测结果。
 
-## 赞助合作
-本项目 CDN 加速及安全防护由 Tencent EdgeOne 赞助：EdgeOne 提供长期有效的免费套餐，包含不限量的流量和请求，覆盖中国大陆节点，且无任何超额收费，感兴趣的朋友可以点击下面的链接领取. 
+### 7) 翻译语音（文章页）
 
-CDN acceleration and security protection for this project are sponsored by Tencent EdgeOne: EdgeOne offers a long-term free plan with unlimited traffic and requests, covering Mainland China nodes, with no overage charges. Interested friends can click the link below to claim it。
+路径：`启灵Ai助手 > 翻译语音`
 
-[亚洲最佳CDN、边缘和安全解决方案 - Tencent EdgeOne](https://edgeone.ai/zh?from=github) 
+- 可开启文章翻译和文章朗读控制条。
+- 翻译支持多语言按钮。
+- 朗读支持腾讯云/百度云 TTS 接口。
+- 可配置排除文章 ID（这些文章不显示翻译/朗读入口）。
 
-[Best Asian CDN, Edge, and Secure Solutions - Tencent EdgeOne](https://edgeone.ai/zh?from=github) 
+### 8) AI PPT（`[docmee_ppt]`）
 
+路径：`启灵Ai助手 > PPT生成`
 
-[![EdgeOne](https://edgeone.ai/media/34fe3a45-492d-4ea4-ae5d-ea1087ca7b4b.png)](https://edgeone.ai/?from=github)
+- 填写文多多（Docmee）API Key。
+- 可设置每个 Token 最大生成次数、容器宽高。
+- 前台短代码页默认要求登录后使用。
+
+### 9) 日志和文件管理
+
+- `对话记录`：查看/删除普通对话历史。
+- `智能体记录`：查看/删除智能体会话记录。
+- `文件列表`：查看并删除已上传到通义千问侧的文件。
+
+## 会员拦截能力
+
+插件提供“关键词命中 + 跳转 URL”的会员提示弹层机制：
+
+- 对话页会员拦截（可选）
+- PPT 页会员拦截（可选）
+
+通常用于与站点现有会员系统联动。
+
+## 数据存储
+
+插件会创建以下数据表：
+
+- `{$wpdb->prefix}deepseek_chat_logs`
+- `{$wpdb->prefix}deepseek_agent_chat_logs`
+
+同时会写入多组插件配置项（options）和部分文章 meta（如总结状态）。
+
+## 卸载说明
+
+插件卸载时会清理大部分配置项（options）。  
+如果你还需要清理历史对话数据表，请手动处理对应数据表。
+
+## 安全说明（当前版本）
+
+- 关键对话 REST 接口已收紧为登录用户 + nonce 校验。
+- 智能体相关请求增加了权限与会话归属校验。
+- 文章生成/发布后台 AJAX 增加了 nonce 校验。
+- Markdown 输出已增加前端净化，降低脚本注入风险。
+
+## 常见问题
+
+1. 聊天页面不显示样式或脚本？
+- 请确认短代码放在“页面（page）”中，而不是文章（post）。
+
+2. 调用模型失败或超时？
+- 检查 API Key、模型参数、接口 URL、服务器外网连通性。
+
+3. 文件上传提示模型不支持？
+- 文档分析仅支持指定模型（如 `qwen-long`、`Kimi`、`OpenAI` 对应模型）。
+
+4. 智能体列表为空？
+- 请先在 `智能体应用` 菜单配置至少一个智能体并保存。
+
+## 开发者备注
+
+- 该插件当前是“WordPress 一体化”方案：前台、配置、权限、日志都在 WP 内完成。
+- 如果后续要拆成“WP 前台 + 独立后端服务”，建议先保留短代码和后台设置页作为兼容层。
