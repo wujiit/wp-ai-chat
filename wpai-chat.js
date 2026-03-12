@@ -583,29 +583,13 @@ function handleSendMessage() {
     if (currentAppId) {
         sendAgentMessage(message, currentAppId);
     } else {
-        fetch(adminAjaxUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: 'action=deepseek_get_current_interface'
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const currentInterface = data.interface;
-                    const modelSelect = document.getElementById('chat-model-select');
-                    const currentModel = modelSelect ? modelSelect.value : '';
-                    sendMessage(message, currentInterface, currentModel);
-                } else {
-                    console.error('获取当前接口失败:', data.message);
-                    showCustomNotification('获取当前接口失败', 'error');
-                }
-            })
-            .catch(error => {
-                console.error('获取接口失败:', error);
-                showCustomNotification('获取接口失败', 'error');
-            });
+        const interfaceSelect = document.getElementById('chat-interface-select');
+        const currentInterface = interfaceSelect
+            ? interfaceSelect.value
+            : ((typeof current_interface !== 'undefined' && current_interface) ? current_interface : 'deepseek');
+        const modelSelect = document.getElementById('chat-model-select');
+        const currentModel = modelSelect ? modelSelect.value : '';
+        sendMessage(message, currentInterface, currentModel);
     }
 }
 
@@ -704,34 +688,36 @@ function sendMessage(message, currentInterface, currentModel) {
                     // 确保新对话时历史记录立即更新
                     if (!currentConversationId) {
                         var historyContainer = document.querySelector('#deepseek-chat-history ul');
-                        var newChatItem = document.createElement('li');
-                        newChatItem.setAttribute('data-conversation-id', data.conversation_id);
-                        newChatItem.innerHTML = '<span class="deepseek-chat-title">' + truncateText(data.conversation_title, 6) + '</span>' +
-                            '<button class="deepseek-delete-log" data-conversation-id="' + data.conversation_id + '">删除</button>';
-                        historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
+                        if (historyContainer) {
+                            var newChatItem = document.createElement('li');
+                            newChatItem.setAttribute('data-conversation-id', data.conversation_id);
+                            newChatItem.innerHTML = '<span class="deepseek-chat-title">' + truncateText(data.conversation_title, 6) + '</span>' +
+                                '<button class="deepseek-delete-log" data-conversation-id="' + data.conversation_id + '">删除</button>';
+                            historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
 
-                        newChatItem.addEventListener('click', function () {
-                            loadChatLog(data.conversation_id);
-                        });
+                            newChatItem.addEventListener('click', function () {
+                                loadChatLog(data.conversation_id);
+                            });
 
-                        newChatItem.querySelector('.deepseek-delete-log').addEventListener('click', function (e) {
-                            e.stopPropagation();
-                            var conversationId = this.getAttribute('data-conversation-id');
-                            fetch(adminAjaxUrl, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/x-www-form-urlencoded',
-                                },
-                                body: 'action=deepseek_delete_log&conversation_id=' + conversationId + '&nonce=' + encodeURIComponent(deepseek_rest_nonce)
-                            }).then(response => response.json())
-                                .then(data => {
-                                    if (data.success) {
-                                        this.parentElement.remove();
-                                        document.getElementById('deepseek-chat-messages').innerHTML = '';
-                                        setCurrentConversationId(null);
-                                    }
-                                });
-                        });
+                            newChatItem.querySelector('.deepseek-delete-log').addEventListener('click', function (e) {
+                                e.stopPropagation();
+                                var conversationId = this.getAttribute('data-conversation-id');
+                                fetch(adminAjaxUrl, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/x-www-form-urlencoded',
+                                    },
+                                    body: 'action=deepseek_delete_log&conversation_id=' + conversationId + '&nonce=' + encodeURIComponent(deepseek_rest_nonce)
+                                }).then(response => response.json())
+                                    .then(data => {
+                                        if (data.success) {
+                                            this.parentElement.remove();
+                                            document.getElementById('deepseek-chat-messages').innerHTML = '';
+                                            setCurrentConversationId(null);
+                                        }
+                                    });
+                            });
+                        }
 
                         setCurrentConversationId(data.conversation_id);
                     }
@@ -741,34 +727,36 @@ function sendMessage(message, currentInterface, currentModel) {
                     handleImageGeneration(data.task_id);
                     if (!currentConversationId) {
                         var historyContainer = document.querySelector('#deepseek-chat-history ul');
-                        var newChatItem = document.createElement('li');
-                        newChatItem.setAttribute('data-conversation-id', data.conversation_id);
-                        newChatItem.innerHTML = '<span class="deepseek-chat-title">' + truncateText(data.conversation_title, 6) + '</span>' +
-                            '<button class="deepseek-delete-log" data-conversation-id="' + data.conversation_id + '">删除</button>';
-                        historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
+                        if (historyContainer) {
+                            var newChatItem = document.createElement('li');
+                            newChatItem.setAttribute('data-conversation-id', data.conversation_id);
+                            newChatItem.innerHTML = '<span class="deepseek-chat-title">' + truncateText(data.conversation_title, 6) + '</span>' +
+                                '<button class="deepseek-delete-log" data-conversation-id="' + data.conversation_id + '">删除</button>';
+                            historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
 
-                        newChatItem.addEventListener('click', function () {
-                            loadChatLog(data.conversation_id);
-                        });
+                            newChatItem.addEventListener('click', function () {
+                                loadChatLog(data.conversation_id);
+                            });
 
-                        newChatItem.querySelector('.deepseek-delete-log').addEventListener('click', function (e) {
-                            e.stopPropagation();
-                            var conversationId = this.getAttribute('data-conversation-id');
-                            fetch(adminAjaxUrl, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/x-www-form-urlencoded',
-                                },
-                                body: 'action=deepseek_delete_log&conversation_id=' + conversationId + '&nonce=' + encodeURIComponent(deepseek_rest_nonce)
-                            }).then(response => response.json())
-                                .then(data => {
-                                    if (data.success) {
-                                        this.parentElement.remove();
-                                        document.getElementById('deepseek-chat-messages').innerHTML = '';
-                                        setCurrentConversationId(null);
-                                    }
-                                });
-                        });
+                            newChatItem.querySelector('.deepseek-delete-log').addEventListener('click', function (e) {
+                                e.stopPropagation();
+                                var conversationId = this.getAttribute('data-conversation-id');
+                                fetch(adminAjaxUrl, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/x-www-form-urlencoded',
+                                    },
+                                    body: 'action=deepseek_delete_log&conversation_id=' + conversationId + '&nonce=' + encodeURIComponent(deepseek_rest_nonce)
+                                }).then(response => response.json())
+                                    .then(data => {
+                                        if (data.success) {
+                                            this.parentElement.remove();
+                                            document.getElementById('deepseek-chat-messages').innerHTML = '';
+                                            setCurrentConversationId(null);
+                                        }
+                                    });
+                            });
+                        }
 
                         setCurrentConversationId(data.conversation_id);
                     }
@@ -778,34 +766,36 @@ function sendMessage(message, currentInterface, currentModel) {
                     handleVideoGeneration(data.task_id);
                     if (!currentConversationId) {
                         var historyContainer = document.querySelector('#deepseek-chat-history ul');
-                        var newChatItem = document.createElement('li');
-                        newChatItem.setAttribute('data-conversation-id', data.conversation_id);
-                        newChatItem.innerHTML = '<span class="deepseek-chat-title">' + truncateText(data.conversation_title, 6) + '</span>' +
-                            '<button class="deepseek-delete-log" data-conversation-id="' + data.conversation_id + '">删除</button>';
-                        historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
+                        if (historyContainer) {
+                            var newChatItem = document.createElement('li');
+                            newChatItem.setAttribute('data-conversation-id', data.conversation_id);
+                            newChatItem.innerHTML = '<span class="deepseek-chat-title">' + truncateText(data.conversation_title, 6) + '</span>' +
+                                '<button class="deepseek-delete-log" data-conversation-id="' + data.conversation_id + '">删除</button>';
+                            historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
 
-                        newChatItem.addEventListener('click', function () {
-                            loadChatLog(data.conversation_id);
-                        });
+                            newChatItem.addEventListener('click', function () {
+                                loadChatLog(data.conversation_id);
+                            });
 
-                        newChatItem.querySelector('.deepseek-delete-log').addEventListener('click', function (e) {
-                            e.stopPropagation();
-                            var conversationId = this.getAttribute('data-conversation-id');
-                            fetch(adminAjaxUrl, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/x-www-form-urlencoded',
-                                },
-                                body: 'action=deepseek_delete_log&conversation_id=' + conversationId + '&nonce=' + encodeURIComponent(deepseek_rest_nonce)
-                            }).then(response => response.json())
-                                .then(data => {
-                                    if (data.success) {
-                                        this.parentElement.remove();
-                                        document.getElementById('deepseek-chat-messages').innerHTML = '';
-                                        setCurrentConversationId(null);
-                                    }
-                                });
-                        });
+                            newChatItem.querySelector('.deepseek-delete-log').addEventListener('click', function (e) {
+                                e.stopPropagation();
+                                var conversationId = this.getAttribute('data-conversation-id');
+                                fetch(adminAjaxUrl, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/x-www-form-urlencoded',
+                                    },
+                                    body: 'action=deepseek_delete_log&conversation_id=' + conversationId + '&nonce=' + encodeURIComponent(deepseek_rest_nonce)
+                                }).then(response => response.json())
+                                    .then(data => {
+                                        if (data.success) {
+                                            this.parentElement.remove();
+                                            document.getElementById('deepseek-chat-messages').innerHTML = '';
+                                            setCurrentConversationId(null);
+                                        }
+                                    });
+                            });
+                        }
 
                         setCurrentConversationId(data.conversation_id);
                     }
@@ -862,36 +852,38 @@ function sendMessage(message, currentInterface, currentModel) {
                                         if (newConversation) {
                                             setCurrentConversationId(jsonData.conversation_id);
                                             var historyContainer = document.querySelector('#deepseek-chat-history ul');
-                                            var newChatItem = document.createElement('li');
-                                            newChatItem.setAttribute('data-conversation-id', jsonData.conversation_id);
-                                            newChatItem.innerHTML = '<span class="deepseek-chat-title">' + truncateText(currentMessage, 6) + '</span>' +
-                                                '<button class="deepseek-delete-log" data-conversation-id="' + jsonData.conversation_id + '">删除</button>';
-                                            historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
+                                            if (historyContainer) {
+                                                var newChatItem = document.createElement('li');
+                                                newChatItem.setAttribute('data-conversation-id', jsonData.conversation_id);
+                                                newChatItem.innerHTML = '<span class="deepseek-chat-title">' + truncateText(currentMessage, 6) + '</span>' +
+                                                    '<button class="deepseek-delete-log" data-conversation-id="' + jsonData.conversation_id + '">删除</button>';
+                                                historyContainer.insertBefore(newChatItem, historyContainer.firstChild);
 
-                                            newChatItem.addEventListener('click', function () {
-                                                loadChatLog(jsonData.conversation_id);
-                                            });
+                                                newChatItem.addEventListener('click', function () {
+                                                    loadChatLog(jsonData.conversation_id);
+                                                });
 
-                                            newChatItem.querySelector('.deepseek-delete-log').addEventListener('click', function (e) {
-                                                e.stopPropagation();
-                                                var conversationId = this.getAttribute('data-conversation-id');
-                                                fetch(adminAjaxUrl, {
-                                                    method: 'POST',
-                                                    headers: {
-                                                        'Content-Type': 'application/x-www-form-urlencoded',
-                                                        'X-WP-Nonce': deepseek_rest_nonce,
-                                                        'X-Device-ID': getDeviceId()
-                                                    },
-                                                    body: 'action=deepseek_delete_log&conversation_id=' + conversationId + '&nonce=' + encodeURIComponent(deepseek_rest_nonce)
-                                                }).then(response => response.json())
-                                                    .then(data => {
-                                                        if (data.success) {
-                                                            this.parentElement.remove();
-                                                            document.getElementById('deepseek-chat-messages').innerHTML = '';
-                                                            setCurrentConversationId(null);
-                                                        }
-                                                    });
-                                            });
+                                                newChatItem.querySelector('.deepseek-delete-log').addEventListener('click', function (e) {
+                                                    e.stopPropagation();
+                                                    var conversationId = this.getAttribute('data-conversation-id');
+                                                    fetch(adminAjaxUrl, {
+                                                        method: 'POST',
+                                                        headers: {
+                                                            'Content-Type': 'application/x-www-form-urlencoded',
+                                                            'X-WP-Nonce': deepseek_rest_nonce,
+                                                            'X-Device-ID': getDeviceId()
+                                                        },
+                                                        body: 'action=deepseek_delete_log&conversation_id=' + conversationId + '&nonce=' + encodeURIComponent(deepseek_rest_nonce)
+                                                    }).then(response => response.json())
+                                                        .then(data => {
+                                                            if (data.success) {
+                                                                this.parentElement.remove();
+                                                                document.getElementById('deepseek-chat-messages').innerHTML = '';
+                                                                setCurrentConversationId(null);
+                                                            }
+                                                        });
+                                                });
+                                            }
                                             newConversation = false;
                                         }
                                         return;

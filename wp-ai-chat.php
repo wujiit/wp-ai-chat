@@ -3,7 +3,7 @@
 Plugin Name: 启灵Ai助手
 Description: 启灵Ai助手插件，支持对话聊天、文章生成、文章总结、AI生成PPT，可对接 DeepSeek、通义千问、豆包等模型以及智能体应用。
 Plugin URI: https://www.jingxialai.com/4827.html
-Version: 4.0.6
+Version: 4.0.7
 Author: Summer
 License: GPL License
 Author URI: https://www.jingxialai.com/
