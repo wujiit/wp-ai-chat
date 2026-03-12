@@ -63,14 +63,11 @@ function deepseek_get_user_interface() {
 }
 
 function deepseek_get_current_interface() {
-    if (!is_user_logged_in()) {
-        wp_send_json_error('请先登录');
-        return;
-    }
     $current_interface = deepseek_get_user_interface();
     wp_send_json_success(['interface' => $current_interface]);
 }
 add_action('wp_ajax_deepseek_get_current_interface', 'deepseek_get_current_interface');
+add_action('wp_ajax_nopriv_deepseek_get_current_interface', 'deepseek_get_current_interface');
 
 // 对话 开始
 function deepseek_chat_shortcode() {
@@ -83,6 +80,8 @@ function deepseek_chat_shortcode() {
     $qwen_enable_search = get_option('qwen_enable_search', '0');
     $current_interface = deepseek_get_user_interface();
     $enable_file_upload = get_option('enable_file_upload', '0');
+    $guest_chat_limit = intval(get_option('deepseek_guest_chat_limit', 5));
+    $guest_chat_enabled = $guest_chat_limit > 0;
 
     $history = array();
     if (is_user_logged_in()) {
@@ -169,7 +168,7 @@ function deepseek_chat_shortcode() {
             </div>
 
             <div id="deepseek-chat-input-container">
-                <?php if (is_user_logged_in()): ?>
+                <?php if (is_user_logged_in() || $guest_chat_enabled): ?>
                     <textarea id="deepseek-chat-input" placeholder="输入你的消息..." rows="4"></textarea>
                     <button id="deepseek-chat-send">发送</button>
                 <?php else: 

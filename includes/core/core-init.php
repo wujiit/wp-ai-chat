@@ -86,18 +86,54 @@ function deepseek_add_menu() {
         '启灵Ai助手', // 菜单标题
         'manage_options',
         'deepseek', // 菜单slug
-        'deepseek_render_settings_page', // 默认加载设置页面
+        'deepseek_render_settings_overview_page', // 默认加载总览页面
         'dashicons-format-chat', // 图标
         6 // 菜单位置
     );
-    // 子菜单项 - 设置
+    // 子菜单项 - 设置总览
     add_submenu_page(
         'deepseek', // 父菜单slug
-        'AI参数设置', // 页面标题
-        '对话设置', // 菜单标题
+        '设置总览', // 页面标题
+        '设置总览', // 菜单标题
         'manage_options',
         'deepseek', // 菜单slug和主菜单一致
-        'deepseek_render_settings_page' // 指向设置页面的回调函数
+        'deepseek_render_settings_overview_page'
+    );
+    // 子菜单项 - 基础设置
+    add_submenu_page(
+        'deepseek',
+        '基础设置',
+        '基础设置',
+        'manage_options',
+        'deepseek-general',
+        'deepseek_render_general_settings_page'
+    );
+    // 子菜单项 - 接口模型
+    add_submenu_page(
+        'deepseek',
+        '接口与模型',
+        '接口模型',
+        'manage_options',
+        'deepseek-models',
+        'deepseek_render_model_settings_page'
+    );
+    // 子菜单项 - 风控权限
+    add_submenu_page(
+        'deepseek',
+        '风控与权限',
+        '风控权限',
+        'manage_options',
+        'deepseek-security',
+        'deepseek_render_security_settings_page'
+    );
+    // 子菜单项 - 功能内容
+    add_submenu_page(
+        'deepseek',
+        '功能与内容',
+        '功能内容',
+        'manage_options',
+        'deepseek-features',
+        'deepseek_render_feature_settings_page'
     );
     // 子菜单项 - 对话记录
     add_submenu_page(

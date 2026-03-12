@@ -689,13 +689,6 @@ function deepseek_rest_request_has_valid_wp_nonce(WP_REST_Request $request) {
 }
 
 function deepseek_send_message_permission(WP_REST_Request $request) {
-    if (!is_user_logged_in()) {
-        return new WP_Error(
-            'rest_forbidden',
-            '请先登录后再使用对话功能',
-            ['status' => 401]
-        );
-    }
     if (!deepseek_rest_request_has_valid_wp_nonce($request)) {
         return new WP_Error(
             'rest_forbidden',
@@ -703,6 +696,18 @@ function deepseek_send_message_permission(WP_REST_Request $request) {
             ['status' => 403]
         );
     }
+
+    if (!is_user_logged_in()) {
+        $guest_chat_limit = intval(get_option('deepseek_guest_chat_limit', 5));
+        if ($guest_chat_limit <= 0) {
+            return new WP_Error(
+                'rest_forbidden',
+                '游客功能已关闭，请先登录后再使用对话功能',
+                ['status' => 401]
+            );
+        }
+    }
+
     return true;
 }
 
