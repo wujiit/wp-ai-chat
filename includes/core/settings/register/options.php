@@ -17,6 +17,14 @@ function deepseek_register_setting_options() {
     register_setting('deepseek_chat_options_group', 'xunfei_api_key'); // 讯飞星火 API Key
     register_setting('deepseek_chat_options_group', 'xunfei_model', array('sanitize_callback' => 'sanitize_text_field')); // 讯飞星火模型参数   
 
+    // OpenAI 兼容新平台
+    register_setting('deepseek_chat_options_group', 'siliconflow_api_key');
+    register_setting('deepseek_chat_options_group', 'siliconflow_model', array('sanitize_callback' => 'sanitize_text_field'));
+    register_setting('deepseek_chat_options_group', 'openrouter_api_key');
+    register_setting('deepseek_chat_options_group', 'openrouter_model', array('sanitize_callback' => 'sanitize_text_field'));
+    register_setting('deepseek_chat_options_group', 'mistral_api_key');
+    register_setting('deepseek_chat_options_group', 'mistral_model', array('sanitize_callback' => 'sanitize_text_field'));
+
     // Gemini
     register_setting('deepseek_chat_options_group', 'gemini_api_key');
     register_setting('deepseek_chat_options_group', 'gemini_model', array('sanitize_callback' => 'sanitize_text_field'));

@@ -311,7 +311,7 @@ function wpatai_enqueue_assets() {
     });
 
     // 加载JS脚本
-    wp_enqueue_script( 'wpatai-script', plugin_dir_url( __FILE__ ) . 'wpai-script.js', array( 'jquery' ), '2.2', true );
+    wp_enqueue_script( 'wpatai-script', plugin_dir_url( __FILE__ ) . 'wpai-script.js', array( 'jquery' ), deepseek_get_asset_version('wpai-script.js'), true );
     wp_localize_script( 'wpatai-script', 'wpatai_ajax_obj', array(
         'ajax_url'  => admin_url( 'admin-ajax.php' ),
         'nonce'     => wp_create_nonce( 'wpatai_translate_nonce' ),
@@ -332,14 +332,15 @@ function wpatai_handle_translation() {
         wp_send_json_error( '无效参数' );
     }
 
-    if (!is_user_logged_in() && function_exists('deepseek_check_guest_limit') && !deepseek_check_guest_limit('chat')) {
-        wp_send_json_error('游客今日翻译/语音生成次数已达上限，请登录。');
-    }
-    
     $post = get_post( $post_id );
     if ( ! $post ) {
         wp_send_json_error( '未找到文章' );
     }
+
+    if (!is_user_logged_in() && function_exists('deepseek_check_guest_limit') && !deepseek_check_guest_limit('chat')) {
+        wp_send_json_error('游客今日翻译/语音生成次数已达上限，请登录。');
+    }
+
     $original_content = $post->post_content;
     
     $options          = get_option( 'wpatai_settings' );
@@ -364,10 +365,6 @@ function wpatai_handle_tts() {
         wp_send_json_error( '无效参数' );
     }
 
-    if (!is_user_logged_in() && function_exists('deepseek_check_guest_limit') && !deepseek_check_guest_limit('chat')) {
-        wp_send_json_error('游客今日语音生成次数已达上限，请登录。');
-    }
-    
     $post = get_post( $post_id );
     if ( ! $post ) {
         wp_send_json_error( '未找到文章' );
@@ -378,6 +375,10 @@ function wpatai_handle_tts() {
     $options = get_option( 'wpatai_settings' );
     if ( empty( $options['enable_tts'] ) ) {
         wp_send_json_error( '语音朗读功能未启用' );
+    }
+
+    if (!is_user_logged_in() && function_exists('deepseek_check_guest_limit') && !deepseek_check_guest_limit('chat')) {
+        wp_send_json_error('游客今日语音生成次数已达上限，请登录。');
     }
     
     // 根据后台设置选择使用哪种语音合成接口
@@ -842,6 +843,19 @@ add_action( 'wpatai_tts_generate', 'wpatai_tts_generate_action', 10, 3 );
 
 // 卸载插件的时候删掉设置项
 function wpatai_delete_plugin_settings() {
+    if (function_exists('deepseek_cleanup_managed_settings_storage')) {
+        deepseek_cleanup_managed_settings_storage();
+    }
+    if (function_exists('deepseek_cleanup_storage_schema')) {
+        deepseek_cleanup_storage_schema();
+    }
+    if (function_exists('deepseek_usage_cleanup_schema')) {
+        deepseek_usage_cleanup_schema();
+    }
+    if (function_exists('deepseek_conversation_cleanup_schema')) {
+        deepseek_conversation_cleanup_schema();
+    }
+
     delete_option('wpatai_settings');
 }
 register_uninstall_hook(defined('DEEPSEEK_PLUGIN_FILE') ? DEEPSEEK_PLUGIN_FILE : __FILE__, 'wpatai_delete_plugin_settings');

@@ -12,26 +12,28 @@ function deepseek_chat_get_rest_nonce_from_request() {
 function deepseek_handle_file_upload() {
     check_ajax_referer('file_upload_action', 'nonce');
 
-    // 检查上传文件权限或游客频率限制
-    if (!is_user_logged_in()) {
-        if (!deepseek_check_guest_limit('upload')) {
-            wp_send_json_error(['message' => '游客今日文件上传次数已达上限，请登录。']);
-            return;
-        }
+    if (deepseek_get_setting('enable_file_upload', '0') !== '1') {
+        wp_send_json_error(['message' => '文件上传功能未开启']);
+        return;
     }
 
+    if (!is_user_logged_in() && intval(deepseek_get_setting('deepseek_guest_chat_limit', 5)) <= 0) {
+        wp_send_json_error(['message' => '游客功能已关闭，请先登录后再上传文件。']);
+        return;
+    }
+	
     if (!isset($_FILES['file'])) {
         wp_send_json_error(['message' => '没有文件被上传']);
         return;
     }
 
-    $allowed_types = array_map('trim', explode(',', get_option('allowed_file_types', 'txt,docx,pdf,xlsx,md')));
-    $max_size = (int)get_option('max_file_size', 100) * 1024 * 1024;
+    $allowed_types = deepseek_get_csv_setting_list('allowed_file_types', 'txt,docx,pdf,xlsx,md');
+    $max_size = (int) deepseek_get_setting('max_file_size', 100) * 1024 * 1024;
     $file = $_FILES['file'];
     $file_extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
     $interface = isset($_POST['interface']) ? sanitize_text_field(wp_unslash($_POST['interface'])) : 'qwen';
     $model = isset($_POST['model']) ? sanitize_text_field(wp_unslash($_POST['model'])) : '';
-    $qwen_video_models = explode(',', get_option('qwen_video_model', 'wanx2.1-t2v-turbo'));
+    $qwen_video_models = deepseek_get_csv_setting_list('qwen_video_model', 'wanx2.1-t2v-turbo');
 
     // 如果是通义千问视频模型，限制文件类型为图片
     if ($interface === 'qwen' && in_array($model, $qwen_video_models)) {
@@ -55,6 +57,11 @@ function deepseek_handle_file_upload() {
             return;
         }
 
+        if (!is_user_logged_in() && !deepseek_check_guest_limit('upload')) {
+            wp_send_json_error(['message' => '游客今日文件上传次数已达上限，请登录。']);
+            return;
+        }
+
         // 上传到媒体库
         require_once(ABSPATH . 'wp-admin/includes/image.php');
         require_once(ABSPATH . 'wp-admin/includes/file.php');
@@ -67,11 +74,33 @@ function deepseek_handle_file_upload() {
         }
 
         $image_url = wp_get_attachment_url($attachment_id);
+        $record_id = 0;
+        if (function_exists('deepseek_record_file_upload')) {
+            $record_id = deepseek_record_file_upload(array(
+                'user_id' => get_current_user_id(),
+                'record_source' => 'chat',
+                'interface_key' => $interface,
+                'provider_name' => 'qwen',
+                'storage_engine' => 'wp_media',
+                'purpose' => 'image_video',
+                'attachment_id' => $attachment_id,
+                'original_filename' => $file['name'],
+                'mime_type' => $file['type'],
+                'file_ext' => $file_extension,
+                'file_size' => isset($file['size']) ? intval($file['size']) : 0,
+                'local_url' => $image_url,
+                'meta' => array(
+                    'model' => $model,
+                ),
+            ));
+            deepseek_mark_attachment_file_record($attachment_id, $record_id, 'chat');
+        }
         wp_send_json_success([
             'file_id' => $attachment_id,
             'filename' => $file['name'],
             'image_url' => $image_url,
-            'interface' => 'qwen'
+            'interface' => 'qwen',
+            'record_id' => $record_id,
         ]);
         return;
     }
@@ -98,8 +127,8 @@ function deepseek_handle_file_upload() {
 
     // 判断模型是否支持文档分析
     $support_doc_models = [
-        'kimi' => explode(',', get_option('kimi_model', '')),
-        'openai' => explode(',', get_option('openai_model', '')),
+        'kimi' => deepseek_get_csv_setting_list('kimi_model', ''),
+        'openai' => deepseek_get_csv_setting_list('openai_model', ''),
         'qwen' => ['qwen-long']
     ];
     $is_doc_supported = false;
@@ -111,18 +140,23 @@ function deepseek_handle_file_upload() {
         return;
     }
 
+    if (!is_user_logged_in() && !deepseek_check_guest_limit('upload')) {
+        wp_send_json_error(['message' => '游客今日文件上传次数已达上限，请登录。']);
+        return;
+    }
+	
     // 接口选择及文件上传
     switch ($interface) {
         case 'qwen':
-            $api_key = get_option('qwen_api_key');
+            $api_key = deepseek_get_setting('qwen_api_key');
             $upload_url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/files';
             break;
         case 'openai':
-            $api_key = get_option('openai_api_key');
+            $api_key = deepseek_get_setting('openai_api_key');
             $upload_url = 'https://api.openai.com/v1/files';
             break;
         case 'kimi':
-            $api_key = get_option('kimi_api_key');
+            $api_key = deepseek_get_setting('kimi_api_key');
             $upload_url = 'https://api.moonshot.cn/v1/files';
             break;
         default:
@@ -175,15 +209,90 @@ function deepseek_handle_file_upload() {
         return;
     }
 
+    $record_id = 0;
+    if (function_exists('deepseek_record_file_upload')) {
+        $record_id = deepseek_record_file_upload(array(
+            'user_id' => get_current_user_id(),
+            'record_source' => 'chat',
+            'interface_key' => $interface,
+            'provider_name' => $interface,
+            'storage_engine' => 'remote_provider',
+            'purpose' => 'document_analysis',
+            'provider_file_id' => $response_data['id'],
+            'original_filename' => $file['name'],
+            'mime_type' => $file['type'],
+            'file_ext' => $file_extension,
+            'file_size' => isset($file['size']) ? intval($file['size']) : 0,
+            'remote_url' => isset($response_data['url']) ? $response_data['url'] : '',
+            'meta' => array(
+                'model' => $model,
+                'provider_response' => $response_data,
+            ),
+        ));
+    }
+
     wp_send_json_success([
         'file_id' => $response_data['id'],
         'filename' => $file['name'],
-        'interface' => $interface
+        'interface' => $interface,
+        'record_id' => $record_id,
     ]);
 }
 
 add_action('wp_ajax_deepseek_upload_file', 'deepseek_handle_file_upload');
+add_action('wp_ajax_nopriv_deepseek_upload_file', 'deepseek_handle_file_upload');
 
+function deepseek_get_recent_files_for_chat() {
+    check_ajax_referer('file_upload_action', 'nonce');
+
+    if (deepseek_get_setting('enable_file_upload', '0') !== '1') {
+        wp_send_json_error(array('message' => '文件上传功能未开启'));
+        return;
+    }
+
+    if (!is_user_logged_in()) {
+        $guest_chat_limit = intval(deepseek_get_setting('deepseek_guest_chat_limit', 5));
+        $guest_upload_limit = intval(deepseek_get_setting('deepseek_guest_upload_limit', 2));
+        if ($guest_chat_limit <= 0 || $guest_upload_limit <= 0) {
+            wp_send_json_error(array('message' => '游客文件复用功能未开启'));
+            return;
+        }
+    }
+
+    $interface = isset($_POST['interface']) ? sanitize_key(wp_unslash($_POST['interface'])) : '';
+    $model = isset($_POST['model']) ? sanitize_text_field(wp_unslash($_POST['model'])) : '';
+
+    if ($interface === '' || $model === '') {
+        wp_send_json_success(array('files' => array()));
+        return;
+    }
+
+    $records = deepseek_get_current_actor_file_records(array(
+        'status' => 'active',
+        'limit' => 50,
+    ));
+
+    $files = array();
+    foreach ($records as $record) {
+        if (!deepseek_file_record_is_compatible_with_chat_model($record, $interface, $model)) {
+            continue;
+        }
+
+        $payload = deepseek_normalize_file_record_for_chat($record);
+        if ($payload) {
+            $files[] = $payload;
+        }
+
+        if (count($files) >= 20) {
+            break;
+        }
+    }
+
+    wp_send_json_success(array('files' => $files));
+}
+add_action('wp_ajax_deepseek_get_recent_files', 'deepseek_get_recent_files_for_chat');
+add_action('wp_ajax_nopriv_deepseek_get_recent_files', 'deepseek_get_recent_files_for_chat');
+	
 // 处理接口切换的AJAX请求
 function deepseek_check_image_task() {
     $nonce = deepseek_chat_get_rest_nonce_from_request();
@@ -192,9 +301,6 @@ function deepseek_check_image_task() {
         return;
     }
 
-    global $wpdb;
-    $table_name = $wpdb->prefix . 'deepseek_chat_logs';
-    
     $task_id = isset($_POST['task_id']) ? sanitize_text_field(wp_unslash($_POST['task_id'])) : '';
     if (empty($task_id)) {
         wp_send_json(['success' => false, 'message' => '缺少任务ID']);
@@ -202,7 +308,7 @@ function deepseek_check_image_task() {
     }
 
     // API频率限制
-    if (!is_user_logged_in() && function_exists('deepseek_check_guest_limit') && !deepseek_check_guest_limit('chat')) {
+    if (!is_user_logged_in() && function_exists('deepseek_check_guest_limit') && !deepseek_check_guest_limit('chat', false)) {
         wp_send_json(['success' => false, 'message' => '游客请求频率超限']);
         return;
     }
@@ -214,30 +320,13 @@ function deepseek_check_image_task() {
     }
 
     // 查询本地数据库验证该任务是否是真的在这个表里生成过的
-    $record = $wpdb->get_row($wpdb->prepare(
-        "SELECT * FROM $table_name WHERE response LIKE %s ORDER BY id DESC LIMIT 1",
-        '%' . $wpdb->esc_like($task_id) . '%'
-    ));
+    $record = deepseek_find_chat_log_by_task_id($task_id);
     if (!$record) {
         wp_send_json(['success' => false, 'message' => '未找到对应的任务记录']);
         return;
     }
-    
-    // 权限校验
-    $user_id = get_current_user_id();
-    if ($user_id == 0) {
-        $device_id = isset($_SERVER['HTTP_X_DEVICE_ID']) ? sanitize_text_field($_SERVER['HTTP_X_DEVICE_ID']) : '';
-        $owner_device_id = get_transient('deepseek_guest_conv_owner_' . $record->conversation_id);
-        if (empty($device_id) || $device_id !== $owner_device_id) {
-            wp_send_json(['success' => false, 'message' => '无权查看此任务']);
-            return;
-        }
-    } else if ($record->user_id != $user_id) {
-        wp_send_json(['success' => false, 'message' => '无权查看此任务']);
-        return;
-    }
 
-    $api_key = get_option('qwen_api_key');
+    $api_key = deepseek_get_setting('qwen_api_key');
     
     $url = 'https://dashscope.aliyuncs.com/api/v1/tasks/' . $task_id;
     
@@ -248,6 +337,7 @@ function deepseek_check_image_task() {
         'Content-Type: application/json'
     ]);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    deepseek_apply_curl_timeouts($ch, 'qwen_task_status', 20, 8);
     
     $response = curl_exec($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -259,16 +349,11 @@ function deepseek_check_image_task() {
             $actual_prompt = $response_data['output']['results'][0]['actual_prompt'] ?? '';
             $image_url = $response_data['output']['results'][0]['url'] ?? '';
 
-            if ($record) {
-                $wpdb->update($table_name, 
-                    ['response' => json_encode([
-                        'status' => 'succeeded',
-                        'actual_prompt' => $actual_prompt,
-                        'image_url' => $image_url
-                    ])], 
-                    ['id' => $record->id]
-                );
-            }
+            deepseek_update_chat_log_response($record->id, array(
+                'status' => 'succeeded',
+                'actual_prompt' => $actual_prompt,
+                'image_url' => $image_url,
+            ));
 
             wp_send_json([
                 'success' => true,
@@ -287,6 +372,7 @@ function deepseek_check_image_task() {
     }
 }
 add_action('wp_ajax_deepseek_check_image_task', 'deepseek_check_image_task');
+add_action('wp_ajax_nopriv_deepseek_check_image_task', 'deepseek_check_image_task');
 
 function deepseek_check_video_task() {
     $nonce = deepseek_chat_get_rest_nonce_from_request();
@@ -295,9 +381,6 @@ function deepseek_check_video_task() {
         return;
     }
 
-    global $wpdb;
-    $table_name = $wpdb->prefix . 'deepseek_chat_logs';
-    
     $task_id = isset($_POST['task_id']) ? sanitize_text_field(wp_unslash($_POST['task_id'])) : '';
     if (empty($task_id)) {
         wp_send_json(['success' => false, 'message' => '缺少任务ID']);
@@ -305,7 +388,7 @@ function deepseek_check_video_task() {
     }
 
     // API频率限制
-    if (!is_user_logged_in() && function_exists('deepseek_check_guest_limit') && !deepseek_check_guest_limit('chat')) {
+    if (!is_user_logged_in() && function_exists('deepseek_check_guest_limit') && !deepseek_check_guest_limit('chat', false)) {
         wp_send_json(['success' => false, 'message' => '游客请求频率超限']);
         return;
     }
@@ -317,30 +400,13 @@ function deepseek_check_video_task() {
     }
 
     // 查询本地数据库验证该任务是否是真的在这个表里生成过的
-    $record = $wpdb->get_row($wpdb->prepare(
-        "SELECT * FROM $table_name WHERE response LIKE %s ORDER BY id DESC LIMIT 1",
-        '%' . $wpdb->esc_like($task_id) . '%'
-    ));
+    $record = deepseek_find_chat_log_by_task_id($task_id);
     if (!$record) {
         wp_send_json(['success' => false, 'message' => '未找到对应的任务记录']);
         return;
     }
-    
-    // 权限校验
-    $user_id = get_current_user_id();
-    if ($user_id == 0) {
-        $device_id = isset($_SERVER['HTTP_X_DEVICE_ID']) ? sanitize_text_field($_SERVER['HTTP_X_DEVICE_ID']) : '';
-        $owner_device_id = get_transient('deepseek_guest_conv_owner_' . $record->conversation_id);
-        if (empty($device_id) || $device_id !== $owner_device_id) {
-            wp_send_json(['success' => false, 'message' => '无权查看此任务']);
-            return;
-        }
-    } else if ($record->user_id != $user_id) {
-        wp_send_json(['success' => false, 'message' => '无权查看此任务']);
-        return;
-    }
 
-    $api_key = get_option('qwen_api_key');
+    $api_key = deepseek_get_setting('qwen_api_key');
     
     $url = 'https://dashscope.aliyuncs.com/api/v1/tasks/' . $task_id;
     
@@ -351,6 +417,7 @@ function deepseek_check_video_task() {
         'Content-Type: application/json'
     ]);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    deepseek_apply_curl_timeouts($ch, 'qwen_task_status', 20, 8);
     
     $response = curl_exec($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -363,15 +430,10 @@ function deepseek_check_video_task() {
         if ($task_status === 'SUCCEEDED') {
             $video_url = $response_data['output']['video_url'] ?? '';
 
-            if ($record) {
-                $wpdb->update($table_name, 
-                    ['response' => json_encode([
-                        'status' => 'succeeded',
-                        'video_url' => $video_url
-                    ])], 
-                    ['id' => $record->id]
-                );
-            }
+            deepseek_update_chat_log_response($record->id, array(
+                'status' => 'succeeded',
+                'video_url' => $video_url,
+            ));
 
             wp_send_json([
                 'success' => true,
@@ -389,6 +451,7 @@ function deepseek_check_video_task() {
     }
 }
 add_action('wp_ajax_deepseek_check_video_task', 'deepseek_check_video_task');
+add_action('wp_ajax_nopriv_deepseek_check_video_task', 'deepseek_check_video_task');
 
 // 加载历史对话记录
 function deepseek_load_log() {
@@ -398,33 +461,12 @@ function deepseek_load_log() {
         return;
     }
 
-    global $wpdb;
-    $table_name = $wpdb->prefix . 'deepseek_chat_logs';
     $conversation_id = isset($_GET['conversation_id']) ? intval($_GET['conversation_id']) : 0;
     if ($conversation_id <= 0) {
         wp_send_json(['success' => false, 'message' => '缺少有效的对话ID']);
         return;
     }
-    $user_id = get_current_user_id();
-
-    // 游客验证
-    if ($user_id == 0) {
-        $device_id = isset($_SERVER['HTTP_X_DEVICE_ID']) ? sanitize_text_field($_SERVER['HTTP_X_DEVICE_ID']) : '';
-        $owner_device_id = get_transient('deepseek_guest_conv_owner_' . $conversation_id);
-        if (empty($device_id) || $device_id !== $owner_device_id) {
-            wp_send_json(array('success' => false, 'message' => '无权加载此对话。'));
-            return;
-        }
-    }
-
-    $logs = $wpdb->get_results($wpdb->prepare(
-        "SELECT * FROM $table_name 
-        WHERE conversation_id = %d 
-        AND user_id = %d 
-        ORDER BY id ASC",
-        $conversation_id,
-        $user_id
-    ));
+    $logs = deepseek_get_chat_conversation_logs($conversation_id);
 
     if (empty($logs)) {
         wp_send_json(array('success' => false, 'message' => '未找到对话记录。'));
@@ -439,6 +481,8 @@ function deepseek_load_log() {
         if ($response && isset($response['video_url'])) {
             $html = '<video controls src="' . esc_url($response['video_url']) . '" style="max-width:100%;height:auto;"></video>';
             $processed[] = array(
+                'id' => (int) $log->id,
+                'conversation_id' => (int) $log->conversation_id,
                 'message'  => esc_html($log->message),
                 'response' => $html
             );
@@ -450,6 +494,8 @@ function deepseek_load_log() {
             $html = '<div class="image-prompt">' . $actual_prompt . '</div>';
             $html .= '<img src="' . esc_url($response['image_url']) . '" style="max-width:100%;height:auto;" />';
             $processed[] = array(
+                'id' => (int) $log->id,
+                'conversation_id' => (int) $log->conversation_id,
                 'message'  => esc_html($log->message),
                 'response' => $html
             );
@@ -466,10 +512,14 @@ function deepseek_load_log() {
             }
 
             $processed[] = array(
+                'id' => (int) $log->id,
+                'conversation_id' => (int) $log->conversation_id,
                 'message'  => esc_html($log->message),
                 'response' => [
                     'content' => $content,
-                    'reasoning_content' => $reasoning_content
+                    'reasoning_content' => $reasoning_content,
+                    'kb_sources' => is_array($response) && isset($response['kb_sources']) ? $response['kb_sources'] : array(),
+                    'prompt_template' => is_array($response) && isset($response['prompt_template']) ? $response['prompt_template'] : null
                 ]
             );
         }
@@ -481,6 +531,7 @@ function deepseek_load_log() {
     ]);
 }
 add_action('wp_ajax_deepseek_load_log', 'deepseek_load_log');
+add_action('wp_ajax_nopriv_deepseek_load_log', 'deepseek_load_log');
 
 // 删除对话记录
 function deepseek_delete_log() {
@@ -490,46 +541,15 @@ function deepseek_delete_log() {
         return;
     }
     
-    global $wpdb;
-    $table_name = $wpdb->prefix . 'deepseek_chat_logs';
     $conversation_id = isset($_POST['conversation_id']) ? intval($_POST['conversation_id']) : 0;
     if ($conversation_id <= 0) {
         wp_send_json(['success' => false, 'message' => '缺少有效的对话ID']);
         return;
     }
-    $user_id = get_current_user_id();
-
-    // 检查所有权权限
-    if (!current_user_can('manage_options')) {
-        if ($user_id == 0) {
-            $device_id = isset($_SERVER['HTTP_X_DEVICE_ID']) ? sanitize_text_field($_SERVER['HTTP_X_DEVICE_ID']) : '';
-            $owner_device_id = get_transient('deepseek_guest_conv_owner_' . $conversation_id);
-            if (empty($device_id) || $device_id !== $owner_device_id) {
-                wp_send_json(['success' => false, 'message' => '无权删除此记录']);
-                return;
-            }
-        } else {
-            $has_record = $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM $table_name WHERE conversation_id = %d AND user_id = %d",
-                $conversation_id, $user_id
-            ));
-            if (!$has_record) {
-                wp_send_json(['success' => false, 'message' => '无权删除此记录']);
-                return;
-            }
-        }
-    }
-
-    // 删除所有与该conversation_id相关的记录
-    $deleted = $wpdb->delete(
-        $table_name,
-        ['conversation_id' => $conversation_id],
-        ['%d']
-    );
+    $deleted = deepseek_delete_chat_conversation($conversation_id);
 
     if ($deleted === false) {
-        error_log("删除对话记录失败: " . $wpdb->last_error);
-        wp_send_json(['success' => false, 'message' => '删除失败: 数据库错误']);
+        wp_send_json(['success' => false, 'message' => '无权删除此记录']);
     } elseif ($deleted === 0) {
         wp_send_json(['success' => false, 'message' => '未找到可删除的记录']);
     } else {
@@ -537,21 +557,26 @@ function deepseek_delete_log() {
     }
 }
 add_action('wp_ajax_deepseek_delete_log', 'deepseek_delete_log');
+add_action('wp_ajax_nopriv_deepseek_delete_log', 'deepseek_delete_log');
 
 // 对话记录管理页面
 function deepseek_render_logs_page() {
-    global $wpdb;
-    $table_name = $wpdb->prefix . 'deepseek_chat_logs';
-    
     // 处理用户ID搜索
     $search_user_id = isset($_GET['user_id']) ? intval($_GET['user_id']) : '';
-    $where_clause = $search_user_id ? $wpdb->prepare("WHERE user_id = %d", $search_user_id) : '';
 
     // 删除记录
     if (isset($_GET['delete_conversation'])) {
         check_admin_referer('delete_chat_log_' . intval($_GET['delete_conversation']));
         $conversation_id = intval($_GET['delete_conversation']);
-        $wpdb->delete($table_name, ['conversation_id' => $conversation_id], ['%d']);
+        global $wpdb;
+        $wpdb->query($wpdb->prepare(
+            "DELETE FROM " . deepseek_get_chat_logs_table_name() . " WHERE conversation_id = %d",
+            $conversation_id
+        ));
+        deepseek_clear_guest_conversation_owner($conversation_id);
+        if (function_exists('deepseek_delete_conversation_meta_all')) {
+            deepseek_delete_conversation_meta_all($conversation_id);
+        }
         echo '<div class="notice notice-success"><p>对话记录已删除。</p></div>';
     }
 
@@ -561,19 +586,10 @@ function deepseek_render_logs_page() {
     $offset = ($current_page - 1) * $per_page;
 
     // 获取总记录数
-    $total_logs = $wpdb->get_var("SELECT COUNT(DISTINCT conversation_id) FROM $table_name $where_clause");
+    $total_logs = deepseek_count_chat_conversations($search_user_id);
 
     // 获取当前页的记录，并关联用户信息
-    $logs = $wpdb->get_results($wpdb->prepare(
-        "SELECT cl.*, u.user_login 
-         FROM $table_name cl 
-         LEFT JOIN {$wpdb->users} u ON cl.user_id = u.ID 
-         $where_clause 
-         GROUP BY cl.conversation_id 
-         ORDER BY cl.created_at DESC 
-         LIMIT %d OFFSET %d",
-        $per_page, $offset
-    ));
+    $logs = deepseek_get_admin_chat_conversations($search_user_id, $per_page, $offset);
 
     ?>
     <div class="wrap">

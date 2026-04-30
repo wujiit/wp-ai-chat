@@ -1,15 +1,30 @@
 <?php
 // 文章发布时标记为需要生成文章总结
 function deepseek_mark_post_for_summary($post_id, $post, $update) {
-    if (!get_option('enable_ai_summary') || $post->post_status !== 'publish' || wp_is_post_revision($post_id)) {
+    if (!get_option('enable_ai_summary') || $post->post_status !== 'publish' || wp_is_post_revision($post_id) || wp_is_post_autosave($post_id)) {
         return;
     }
 
     update_post_meta($post_id, '_needs_ai_summary', 1);
+    deepseek_schedule_summary_generation($post_id, 60);
 }
 add_action('wp_after_insert_post', 'deepseek_mark_post_for_summary', 10, 3);
 
-// 文章第一次访问时生成总结
+function deepseek_schedule_summary_generation($post_id, $delay = 60) {
+    $post_id = absint($post_id);
+    if ($post_id <= 0) {
+        return false;
+    }
+
+    $args = array($post_id);
+    if (wp_next_scheduled('deepseek_generate_post_summary', $args)) {
+        return true;
+    }
+
+    return (bool) wp_schedule_single_event(time() + max(10, intval($delay)), 'deepseek_generate_post_summary', $args);
+}
+
+// 老版本遗留的待生成文章，在访问时只补排队，不再阻塞当前访客。
 function deepseek_generate_summary_on_first_visit() {
     if (!get_option('enable_ai_summary') || !is_single()) {
         return;
@@ -20,18 +35,38 @@ function deepseek_generate_summary_on_first_visit() {
         return;
     }
 
-    $post = get_post($post_id);
-    $content = $post->post_content;
+    $last_attempt = (int) get_post_meta($post_id, '_ai_summary_last_attempt', true);
+    if ($last_attempt > 0 && (time() - $last_attempt) < 15 * MINUTE_IN_SECONDS) {
+        return;
+    }
 
-    // 明确传入类型
+    deepseek_schedule_summary_generation($post_id, 10);
+}
+add_action('template_redirect', 'deepseek_generate_summary_on_first_visit');
+
+function deepseek_generate_post_summary_async($post_id) {
+    $post_id = absint($post_id);
+    if (!get_option('enable_ai_summary') || $post_id <= 0 || !get_post_meta($post_id, '_needs_ai_summary', true)) {
+        return;
+    }
+
+    $post = get_post($post_id);
+    if (!$post || $post->post_status !== 'publish') {
+        return;
+    }
+
+    update_post_meta($post_id, '_ai_summary_last_attempt', time());
+    $content = wp_strip_all_tags(strip_shortcodes((string) $post->post_content));
+
     $summary = deepseek_call_ai_api($content, 'summary');
 
     if ($summary) {
         update_post_meta($post_id, '_ai_summary', $summary);
         delete_post_meta($post_id, '_needs_ai_summary');
+        delete_post_meta($post_id, '_ai_summary_last_attempt');
     }
 }
-add_action('template_redirect', 'deepseek_generate_summary_on_first_visit');
+add_action('deepseek_generate_post_summary', 'deepseek_generate_post_summary_async');
 
 // 调用AI接口生成文章总结
 function deepseek_call_ai_api($content, $interface_type = 'summary') {
@@ -41,73 +76,23 @@ function deepseek_call_ai_api($content, $interface_type = 'summary') {
 
     // 根据传入的接口类型选择配置，默认使用summary
     $interface_choice = ($interface_type === 'summary') 
-        ? get_option('summary_interface_choice', 'deepseek') 
-        : get_option('chat_interface_choice', 'deepseek');
+        ? deepseek_get_setting('summary_interface_choice', 'deepseek') 
+        : deepseek_get_default_chat_interface();
 
-    // 获取模型参数并取第一个模型
-    switch ($interface_choice) {
-        case 'deepseek':
-            $api_key = get_option('deepseek_api_key');
-            $model_string = get_option('deepseek_model', 'deepseek-chat');
-            $url = 'https://api.deepseek.com/chat/completions';
-            break;
-        case 'doubao':
-            $api_key = get_option('doubao_api_key');
-            $model_string = get_option('doubao_model', '');
-            $url = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
-            break;
-        case 'hunyuan':
-            $api_key = get_option('hunyuan_api_key');
-            $model_string = get_option('hunyuan_model', '');
-            $url = 'https://api.hunyuan.cloud.tencent.com/v1/chat/completions';
-            break;            
-        case 'qwen':
-            $api_key = get_option('qwen_api_key');
-            $model_string = get_option('qwen_text_model', 'qwen-max');
-            $url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
-            break;
-        case 'kimi':
-            $api_key = get_option('kimi_api_key');
-            $model_string = get_option('kimi_model', '');
-            $url = 'https://api.moonshot.cn/v1/chat/completions';
-            break;       
-        case 'openai':
-            $api_key = get_option('openai_api_key');
-            $model_string = get_option('openai_model', '');
-            $url = 'https://api.openai.com/v1/chat/completions';
-            break;
-        case 'grok':
-            $api_key = get_option('grok_api_key');
-            $model_string = get_option('grok_model', '');
-            $url = 'https://api.x.ai/v1/chat/completions';
-            break;               
-        case 'qianfan':
-            $api_key = get_option('qianfan_api_key');
-            $model_string = get_option('qianfan_model', '');
-            $url = 'https://qianfan.baidubce.com/v2/chat/completions';
-            break;
-        case 'xunfei':
-            $api_key = get_option('xunfei_api_key');
-            $model_string = get_option('xunfei_model', '');
-            $url = 'https://spark-api-open.xf-yun.com/v1/chat/completions';
-            break;                                               
-        case 'custom':
-            $api_key = get_option('custom_api_key');
-            $model_string = get_option('custom_model_params', '');
-            $url = get_option('custom_model_url');
-            if (empty($api_key) || empty($model_string) || empty($url)) {
-                error_log('自定义模型设置不完整');
-                return false;
-            }
-            break;            
-        default:
-            error_log('未知的接口类型: ' . $interface_choice);
-            return false;
+    $provider_config = deepseek_get_openai_compatible_provider_config($interface_choice);
+    if (!$provider_config) {
+        error_log('未知的接口类型: ' . $interface_choice);
+        return false;
     }
+
+    $api_key = $provider_config['api_key'];
+    $model_string = $provider_config['model_string'];
+    $url = $provider_config['api_url'];
+    $default_model = $provider_config['default_model'];
 
     // 处理多模型参数，取第一个模型
     $model_list = array_filter(array_map('trim', explode(',', $model_string)));
-    $model = !empty($model_list) ? $model_list[0] : ''; // 如果有多个模型，取第一个；否则为空
+    $model = !empty($model_list) ? $model_list[0] : $default_model;
 
     // 检查必要参数
     if (empty($api_key) || empty($model) || empty($url)) {
@@ -115,6 +100,13 @@ function deepseek_call_ai_api($content, $interface_type = 'summary') {
                   ', Model: ' . ($model ? $model : '未设置') . 
                   ', URL: ' . ($url ? $url : '未设置'));
         return false;
+    }
+
+    $content = trim((string) $content);
+    if (function_exists('mb_substr')) {
+        $content = mb_substr($content, 0, 8000, 'UTF-8');
+    } else {
+        $content = substr($content, 0, 8000);
     }
 
     // 构建请求数据
@@ -139,7 +131,7 @@ function deepseek_call_ai_api($content, $interface_type = 'summary') {
             'Authorization' => 'Bearer ' . $api_key
         ),
         'body' => json_encode($data),
-        'timeout' => 30
+        'timeout' => function_exists('deepseek_get_http_timeout') ? deepseek_get_http_timeout('summary', 30) : 30
     ));
 
     if (is_wp_error($response)) {

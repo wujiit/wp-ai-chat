@@ -27,13 +27,19 @@ function deepseek_render_article_generator_page() {
 
             <p><strong>选择接口(模型需要支持长文本)：</strong></p>
             <?php
-            $interface_choice = get_option('chat_interface_choice', 'deepseek');
+            $interface_labels = deepseek_get_chat_interface_labels();
+            $text_provider_configs = deepseek_get_openai_compatible_provider_configs();
+            $interface_choice = deepseek_get_default_chat_interface();
+            if (!isset($text_provider_configs[$interface_choice])) {
+                $interface_choice = 'deepseek';
+            }
             ?>
             <select name="interface_choice">
-                <option value="deepseek" <?php selected($interface_choice, 'deepseek'); ?>>DeepSeek</option>
-                <option value="doubao" <?php selected($interface_choice, 'doubao'); ?>>豆包AI</option>
-                <option value="qwen" <?php selected($interface_choice, 'qwen'); ?>>通义千问</option>
-                <option value="custom" <?php selected($interface_choice, 'custom'); ?>>自定义模型</option>
+                <?php foreach ($text_provider_configs as $value => $config): ?>
+                    <option value="<?php echo esc_attr($value); ?>" <?php selected($interface_choice, $value); ?>>
+                        <?php echo esc_html($interface_labels[$value] ?? $value); ?>
+                    </option>
+                <?php endforeach; ?>
             </select>
 
             <p><strong>启用联网搜索（仅限通义千问qwen-max、qwen-plus、qwen-turbo模型）：</strong></p>
@@ -200,27 +206,16 @@ function deepseek_generate_article_stream_ajax() {
         exit;
     }
 
-    $api_key = get_option($interface_choice . '_api_key');
-    $model_string = ($interface_choice === 'custom') ? get_option('custom_model_params') : 
-                    ($interface_choice === 'qwen' ? get_option('qwen_text_model') : get_option($interface_choice . '_model'));
-
-    if ($interface_choice === 'deepseek') {
-        $url = 'https://api.deepseek.com/chat/completions';
-        $default_model = 'deepseek-chat';
-    } elseif ($interface_choice === 'doubao') {
-        $url = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
-        $default_model = '';
-    } elseif ($interface_choice === 'qwen') {
-        $url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
-        $default_model = 'qwen-max';
-    } elseif ($interface_choice === 'custom') {
-        $url = get_option('custom_model_url');
-        $default_model = '';
-    } else {
+    $provider_config = deepseek_get_openai_compatible_provider_config($interface_choice);
+    if (!$provider_config) {
         echo "data: " . json_encode(['error' => '不支持的接口']) . "\n\n";
         flush();
         exit;
     }
+    $api_key = $provider_config['api_key'];
+    $model_string = $provider_config['model_string'];
+    $url = $provider_config['api_url'];
+    $default_model = $provider_config['default_model'];
 
     // 处理多模型参数，取第一个模型
     $model_list = array_filter(array_map('trim', explode(',', $model_string)));
@@ -391,14 +386,8 @@ function deepseek_article_analysis_meta_box_callback($post) {
             <label for="analysis_interface"><strong>选择AI接口：</strong></label>
             <select id="analysis_interface" name="analysis_interface">
                 <?php
-                $options = array(
-                    'deepseek' => 'DeepSeek',
-                    'openai' => 'OpenAI',
-                    'qwen' => '通义千问',
-                    'kimi' => 'Kimi',
-                    'doubao' => '豆包AI',
-                    'custom' => '自定义接口'
-                );
+                $interface_labels = deepseek_get_chat_interface_labels();
+                $options = array_intersect_key($interface_labels, deepseek_get_openai_compatible_provider_configs());
                 foreach ($options as $value => $label) {
                     echo '<option value="' . esc_attr($value) . '" ' . selected($interface, $value, false) . '>' . esc_html($label) . '</option>';
                 }
@@ -473,31 +462,14 @@ function deepseek_analyze_article() {
         wp_send_json_error(array('message' => '标题或内容为空'));
     }
 
-    $api_key = get_option($interface . '_api_key');
-    $model_string = ($interface === 'custom') ? get_option('custom_model_params') : 
-                    ($interface === 'qwen' ? get_option('qwen_text_model') : get_option($interface . '_model'));
-
-    if ($interface === 'deepseek') {
-        $url = 'https://api.deepseek.com/chat/completions';
-        $default_model = 'deepseek-chat';
-    } elseif ($interface === 'openai') {
-        $url = 'https://api.openai.com/v1/chat/completions';
-        $default_model = 'gpt-3.5-turbo';
-    } elseif ($interface === 'qwen') {
-        $url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
-        $default_model = 'qwen-max';
-    } elseif ($interface === 'kimi') {
-        $url = 'https://api.moonshot.ai/v1/chat/completions';
-        $default_model = 'moonshot-v1-8k';
-    } elseif ($interface === 'doubao') {
-        $url = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
-        $default_model = '';
-    } elseif ($interface === 'custom') {
-        $url = get_option('custom_model_url');
-        $default_model = '';
-    } else {
+    $provider_config = deepseek_get_openai_compatible_provider_config($interface);
+    if (!$provider_config) {
         wp_send_json_error(array('message' => '不支持的接口'));
     }
+    $api_key = $provider_config['api_key'];
+    $model_string = $provider_config['model_string'];
+    $url = $provider_config['api_url'];
+    $default_model = $provider_config['default_model'];
 
     $model_list = array_filter(array_map('trim', explode(',', $model_string)));
     $model = !empty($model_list) ? $model_list[0] : $default_model;

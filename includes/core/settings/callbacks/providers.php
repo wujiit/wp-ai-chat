@@ -36,6 +36,39 @@ function xunfei_model_callback() {
     echo '<input type="text" name="xunfei_model" value="' . esc_attr($model) . '" style="width: 500px;" />';
 }
 
+// 硅基流动回调函数
+function siliconflow_api_key_callback() {
+    $api_key = get_option('siliconflow_api_key');
+    echo '<input type="text" name="siliconflow_api_key" value="' . esc_attr($api_key) . '" style="width: 500px;" />';
+}
+function siliconflow_model_callback() {
+    $model = get_option('siliconflow_model', 'Qwen/QwQ-32B');
+    echo '<input type="text" name="siliconflow_model" value="' . esc_attr($model) . '" style="width: 500px;" />';
+    echo '<p class="description">多个模型用英文逗号分隔，例如：Qwen/QwQ-32B,deepseek-ai/DeepSeek-V3。</p>';
+}
+
+// OpenRouter 回调函数
+function openrouter_api_key_callback() {
+    $api_key = get_option('openrouter_api_key');
+    echo '<input type="text" name="openrouter_api_key" value="' . esc_attr($api_key) . '" style="width: 500px;" />';
+}
+function openrouter_model_callback() {
+    $model = get_option('openrouter_model', 'openai/gpt-4o-mini');
+    echo '<input type="text" name="openrouter_model" value="' . esc_attr($model) . '" style="width: 500px;" />';
+    echo '<p class="description">填写 OpenRouter 模型 ID，多个模型用英文逗号分隔。</p>';
+}
+
+// Mistral 回调函数
+function mistral_api_key_callback() {
+    $api_key = get_option('mistral_api_key');
+    echo '<input type="text" name="mistral_api_key" value="' . esc_attr($api_key) . '" style="width: 500px;" />';
+}
+function mistral_model_callback() {
+    $model = get_option('mistral_model', 'mistral-small-latest');
+    echo '<input type="text" name="mistral_model" value="' . esc_attr($model) . '" style="width: 500px;" />';
+    echo '<p class="description">多个模型用英文逗号分隔，例如：mistral-small-latest,mistral-large-latest。</p>';
+}
+
 // 通义千问相关回调
 function qwen_api_key_callback() {
     $api_key = get_option('qwen_api_key');
@@ -190,6 +223,7 @@ function get_deepseek_balance() {
             'Accept' => 'application/json',
             'Authorization' => 'Bearer ' . $api_key,
         ),
+        'timeout' => deepseek_get_http_timeout('provider_balance', 15),
     ));
 
     if (is_wp_error($response)) {

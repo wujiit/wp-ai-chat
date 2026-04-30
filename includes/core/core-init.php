@@ -206,7 +206,7 @@ add_action('admin_menu', 'deepseek_add_menu');
 function deepseek_enqueue_admin_assets($hook_suffix) {
     // 检查是否是启灵Ai助手插件相关的页面（slug 都包含 deepseek 或 wpatai/wpaippt 相关的注册项，这里统一检查）
     if (strpos($hook_suffix, 'deepseek') !== false || strpos($hook_suffix, 'wpatai_settings_page') !== false || strpos($hook_suffix, 'wpaippt_settings_page') !== false) {
-        wp_enqueue_style('deepseek-admin-style', DEEPSEEK_PLUGIN_URL . 'wpai-admin-style.css');
+        wp_enqueue_style('deepseek-admin-style', DEEPSEEK_PLUGIN_URL . 'wpai-admin-style.css', array(), deepseek_get_asset_version('wpai-admin-style.css'));
     }
 }
 add_action('admin_enqueue_scripts', 'deepseek_enqueue_admin_assets');

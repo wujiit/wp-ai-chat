@@ -106,9 +106,40 @@ body {
     box-shadow: 0 6px 15px rgba(37, 117, 252, 0.3);
 }
 
+#deepseek-chat-history li.deepseek-history-pinned {
+    border-color: rgba(30, 185, 128, 0.38);
+    background: linear-gradient(135deg, rgba(30, 185, 128, 0.12), rgba(37, 117, 252, 0.08));
+}
+
 #deepseek-chat-history li .deepseek-chat-title {
+    display: block;
+    margin-bottom: 8px;
     font-weight: 600;
     letter-spacing: 0.3px;
+}
+
+.deepseek-history-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.deepseek-history-actions button {
+    border: 1px solid rgba(37, 117, 252, 0.14);
+    background: rgba(255, 255, 255, 0.72);
+    color: #3f4d63;
+    border-radius: 999px;
+    padding: 3px 8px;
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1.6;
+    transition: all 0.2s ease;
+}
+
+.deepseek-history-actions button:hover {
+    transform: translateY(-1px);
+    border-color: rgba(30, 185, 128, 0.42);
+    color: #0f6847;
 }
 
 /* 新对话按钮 */
@@ -322,6 +353,41 @@ body {
     line-height: 1.7;
 }
 
+.deepseek-kb-sources {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(45, 55, 72, 0.1);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.deepseek-kb-sources-title {
+    width: 100%;
+    color: #52616b;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.deepseek-kb-source-item {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    padding: 5px 9px;
+    border-radius: 999px;
+    background: rgba(30, 185, 128, 0.11);
+    color: #087f5b;
+    font-size: 12px;
+    line-height: 1.4;
+    text-decoration: none;
+}
+
+a.deepseek-kb-source-item:hover {
+    background: rgba(30, 185, 128, 0.18);
+    color: #065f46;
+}
+
 /* =============== 输入区域 =============== */
 #deepseek-chat-input-container {
     display: flex;
@@ -386,7 +452,6 @@ body {
 /* 删除对话 */
 .deepseek-delete-log {
     background-color: #ff4d4f;
-    float: right;
     color: white;
     border: none;
     padding: 4px 8px;
@@ -402,6 +467,97 @@ body {
 }
 
 /* 快捷提示词 */
+#deepseek-prompt-library {
+    margin: 16px 0 6px;
+    padding: 16px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, rgba(30, 185, 128, 0.08), rgba(37, 117, 252, 0.08));
+    border: 1px solid rgba(30, 185, 128, 0.14);
+}
+
+.deepseek-prompt-library-title {
+    margin-bottom: 10px;
+    color: #263238;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.deepseek-prompt-library-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+}
+
+.deepseek-prompt-template {
+    text-align: left;
+    padding: 12px 14px;
+    border: 1px solid rgba(37, 117, 252, 0.14);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.76);
+    color: #243447;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.deepseek-prompt-template:hover,
+.deepseek-prompt-template.selected {
+    transform: translateY(-2px);
+    border-color: rgba(30, 185, 128, 0.48);
+    box-shadow: 0 10px 24px rgba(30, 185, 128, 0.12);
+}
+
+.deepseek-prompt-template-title {
+    display: block;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.deepseek-prompt-template-category {
+    display: block;
+    margin-top: 4px;
+    color: #667085;
+    font-size: 12px;
+}
+
+.deepseek-feedback {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(36, 52, 71, 0.08);
+    color: #667085;
+    font-size: 12px;
+}
+
+.deepseek-feedback-button {
+    border: 1px solid rgba(30, 185, 128, 0.18);
+    background: rgba(255, 255, 255, 0.72);
+    color: #243447;
+    border-radius: 999px;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 12px;
+}
+
+.deepseek-feedback-button:hover,
+.deepseek-feedback-button.selected {
+    border-color: rgba(30, 185, 128, 0.55);
+    background: rgba(30, 185, 128, 0.1);
+    color: #0f6847;
+}
+
+.deepseek-feedback.is-loading .deepseek-feedback-button {
+    opacity: 0.58;
+    pointer-events: none;
+}
+
+.deepseek-feedback-status {
+    color: #0f6847;
+}
+
 #deepseek-custom-prompts {
     padding: 15px;
     margin-top: 10px;
@@ -738,6 +894,52 @@ body {
 
 #uploaded-files-list div button:hover, #agent-uploaded-file .remove-file-btn:hover {
     background: #ff2a2d;
+}
+
+#deepseek-recent-files-panel {
+    display: none;
+    flex-basis: 100%;
+    gap: 8px;
+    max-width: 520px;
+    padding: 8px;
+    background: rgba(255,255,255,0.78);
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 8px;
+    overflow-x: auto;
+}
+
+#deepseek-recent-files-panel.visible {
+    display: flex;
+}
+
+.deepseek-recent-file-item {
+    min-width: 150px;
+    max-width: 220px;
+    padding: 7px 9px;
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 6px;
+    background: #fff;
+    color: #333;
+    cursor: pointer;
+    text-align: left;
+}
+
+.deepseek-recent-file-title {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.deepseek-recent-file-meta,
+.deepseek-recent-file-empty {
+    display: block;
+    margin-top: 3px;
+    color: #667085;
+    font-size: 12px;
+    line-height: 1.4;
 }
 
 /* 智能体额外样式 */

@@ -10,6 +10,8 @@ function deepseek_render_settings_overview_content() {
         '接口模型' => 'deepseek-models',
         '风控权限' => 'deepseek-security',
         '功能内容' => 'deepseek-features',
+        '提示词库' => 'deepseek-prompts',
+        '使用统计' => 'deepseek-usage',
         '对话记录' => 'deepseek-logs',
         '智能体应用' => 'deepseek-agents',
     );
@@ -134,7 +136,7 @@ function deepseek_handle_auto_fix_settings() {
         }
         $option = sanitize_key($fix['option']);
         $value = isset($fix['value']) ? $fix['value'] : '';
-        $updated = update_option($option, $value);
+        $updated = deepseek_update_setting($option, $value, false);
         if ($updated) {
             $updated_count++;
         }

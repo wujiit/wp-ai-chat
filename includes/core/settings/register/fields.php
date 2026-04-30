@@ -50,6 +50,14 @@ function deepseek_register_setting_fields() {
     add_settings_field('xunfei_api_key', '讯飞星火 API Key', 'xunfei_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
     add_settings_field('xunfei_model', '讯飞星火 模型参数', 'xunfei_model_callback', 'deepseek-chat', 'deepseek_main_section');
 
+    // OpenAI 兼容新平台配置项
+    add_settings_field('siliconflow_api_key', '硅基流动 API Key', 'siliconflow_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
+    add_settings_field('siliconflow_model', '硅基流动 模型参数', 'siliconflow_model_callback', 'deepseek-chat', 'deepseek_main_section');
+    add_settings_field('openrouter_api_key', 'OpenRouter API Key', 'openrouter_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
+    add_settings_field('openrouter_model', 'OpenRouter 模型参数', 'openrouter_model_callback', 'deepseek-chat', 'deepseek_main_section');
+    add_settings_field('mistral_api_key', 'Mistral API Key', 'mistral_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
+    add_settings_field('mistral_model', 'Mistral 模型参数', 'mistral_model_callback', 'deepseek-chat', 'deepseek_main_section');
+
     // 通义千问配置项
     add_settings_field('qwen_api_key', '通义千问 API Key', 'qwen_api_key_callback', 'deepseek-chat', 'deepseek_main_section');
     add_settings_field('qwen_text_model', '通义千问 文本模型参数', 'qwen_text_model_callback', 'deepseek-chat', 'deepseek_main_section');

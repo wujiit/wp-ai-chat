@@ -501,7 +501,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return new Promise((resolve) => {
             if (typeof DocmeeUI !== 'undefined') return resolve();
             const script = document.createElement('script');
-            script.src = '<?php echo plugins_url('docmee-ui-sdk-iframe.min.js', __FILE__); ?>';
+            script.src = '<?php echo esc_url(add_query_arg('ver', deepseek_get_asset_version('docmee-ui-sdk-iframe.min.js'), plugins_url('docmee-ui-sdk-iframe.min.js', __FILE__))); ?>';
             script.onload = resolve;
             document.head.appendChild(script);
         });
@@ -552,19 +552,62 @@ document.querySelector('#page_customTemplate').addEventListener('click', () => {
 
 // AJAX处理生成Token
 add_action('wp_ajax_generate_docmee_token', 'generate_docmee_token');
+function docmee_get_qilingshop_vip_instance() {
+    if (!class_exists('QilingShop_VIP')) {
+        return null;
+    }
+
+    if (method_exists('QilingShop_VIP', 'instance')) {
+        return QilingShop_VIP::instance();
+    }
+
+    if (method_exists('QilingShop_VIP', 'get_instance')) {
+        return QilingShop_VIP::get_instance();
+    }
+
+    return null;
+}
+
+function docmee_current_user_can_generate_ppt() {
+    $user_id = get_current_user_id();
+    if ($user_id <= 0) {
+        return false;
+    }
+
+    $can_generate = true;
+    if (intval(get_option('docmee_vip_check_enabled', 0)) === 1) {
+        $vip_instance = docmee_get_qilingshop_vip_instance();
+        if ($vip_instance && method_exists($vip_instance, 'get_user_level')) {
+            $can_generate = intval($vip_instance->get_user_level($user_id)) > 0;
+        }
+
+        $can_generate = (bool) apply_filters('docmee_current_user_can_generate_ppt', $can_generate, $user_id);
+    }
+
+    return $can_generate;
+}
+
 function generate_docmee_token() {
     $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
     if (!wp_verify_nonce($nonce, 'docmee_generate_token_nonce')) {
         wp_send_json_error(['message' => '无效的请求', 'code' => 403]);
     }
         
-    if (!is_user_logged_in() || !current_user_can('manage_options')) {
+    if (!is_user_logged_in()) {
         wp_send_json_error(['message' => '权限不足', 'code' => 403]);
     }
 
+    if (!docmee_current_user_can_generate_ppt()) {
+        wp_send_json_error(['message' => '请先开通会员后再使用AI生成PPT服务', 'code' => 403]);
+    }
+
     $api_key = get_option('docmee_api_key');
+    if (empty($api_key)) {
+        wp_send_json_error(['message' => '文多多 API Key 未配置', 'code' => 400]);
+    }
+
     $uid = get_current_user_id();
-    $limit = get_option('docmee_token_limit', 10);  // 获取设置中的最大生成次数
+    $limit = max(1, min(100, intval(get_option('docmee_token_limit', 10))));  // 获取设置中的最大生成次数
 
     $response = wp_remote_post('https://docmee.cn/api/user/createApiToken', [
         'headers' => [
@@ -574,7 +617,8 @@ function generate_docmee_token() {
         'body' => json_encode([
             'uid' => strval($uid),
             'limit' => $limit  // 在请求中添加limit
-        ])
+        ]),
+        'timeout' => 20
     ]);
 
     if(is_wp_error($response)) {
@@ -582,9 +626,16 @@ function generate_docmee_token() {
     }
 
     $body = json_decode(wp_remote_retrieve_body($response), true);
+    if (!is_array($body) || !isset($body['code'])) {
+        wp_send_json_error(['message' => '创建Token异常: 接口返回格式错误', 'code' => 400]);
+    }
 
-    if($body['code'] !== 0) {
-        wp_send_json_error(['message' => '创建Token异常: ' . $body['message'], 'code' => 400]);
+    if ((int) $body['code'] !== 0) {
+        wp_send_json_error(['message' => '创建Token异常: ' . ($body['message'] ?? '未知错误'), 'code' => 400]);
+    }
+
+    if (empty($body['data']['token']) || empty($body['data']['expireTime'])) {
+        wp_send_json_error(['message' => '创建Token异常: 缺少Token数据', 'code' => 400]);
     }
 
     wp_send_json_success([
